@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CacheTrace">
+  <g>
+    <rect x="4" y="4" width="16" height="16" rx="4" fill="#EA9999"/>
+    <rect x="24" y="4" width="16" height="16" rx="4" fill="#C9DAF8"/>
+    <rect x="44" y="4" width="16" height="16" rx="4" fill="#B6D7A8"/>
+    <rect x="4" y="24" width="16" height="16" rx="4" fill="#EA9999"/>
+    <rect x="4" y="44" width="16" height="16" rx="4" fill="#EA9999"/>
+    <rect x="24" y="44" width="16" height="16" rx="4" fill="#C9DAF8"/>
+    <rect x="44" y="44" width="16" height="16" rx="4" fill="#B6D7A8"/>
+  </g>
+  <circle cx="32" cy="32" r="6" fill="#FFC247"/>
+</svg>
