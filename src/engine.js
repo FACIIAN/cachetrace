@@ -389,7 +389,9 @@ const CacheLab = (function () {
         if (ins) ws.mergeCells(row, c1, row, c2);
         for (let c = c1; c <= c2; c++) {
           const cell = ws.getCell(row, c);
-          cell.value = ins ? (c === c1 ? ins : null) : (by ? by[c - c1] : null);
+          // In a merged range only the first cell may be assigned: writing to the others overwrites the merged value.
+          if (!ins) cell.value = by ? by[c - c1] : null;
+          else if (c === c1) cell.value = ins;
           cell.font = font;
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
           cell.border = { top: hair, bottom: hair, left: hair, right: hair };

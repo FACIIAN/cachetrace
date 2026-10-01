@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-10-03
+
+### Fixed
+- Excel export: the instruction labels (`I_n`) were missing from the cache state tables and from the evolution sheets, so lines holding program code appeared empty. Merged cells were being overwritten when written. A test now saves the workbook, reads it back and checks the labels.
+- The solved example workbook in `examples/` was regenerated.
+
 ## [1.1.0] - 2026-10-02
 
 ### Added

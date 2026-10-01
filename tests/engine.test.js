@@ -152,6 +152,25 @@ test('un registro donde se espera un inmediato da un mensaje claro', () => {
   assert.match(L.simulate({ ...BASE, program: 'addi r1, r1, r11', dump: '' }).errors[0], /es un registro/);
 });
 
+test('el Excel conserva las etiquetas I_n de las líneas con instrucciones tras guardarlo y leerlo', async () => {
+  const sim = L.simulate({ ...BASE, program: read('programa.txt'), dump: read('dump.txt') });
+  const buf = await L.buildWorkbook(ExcelJS, sim, {}).xlsx.writeBuffer();
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  for (const name of ['Mapeo Directo(DM)', 'SA2W', 'SA4W', 'FA', 'DM - evolución']) {
+    const labels = new Set();
+    wb.getWorksheet(name).eachRow((row) => row.eachCell((cell) => { if (typeof cell.value === 'string' && /^I\d+$/.test(cell.value)) labels.add(cell.value); }));
+    assert.ok(labels.size > 0, `${name}: faltan las etiquetas de instrucción`);
+  }
+  // every instruction word that is in the final SA4W state must appear in the sheet
+  const expected = new Set();
+  model(sim, 'SA4W').finalSnap.forEach((ln) => { if (ln.valid) ln.words.forEach((w) => { if (L.wordIns(w)) expected.add(L.wordIns(w)); }); });
+  assert.ok(expected.size >= 4);
+  const all = new Set();
+  wb.getWorksheet('SA4W').eachRow((row) => row.eachCell((cell) => { if (typeof cell.value === 'string' && /^I\d+$/.test(cell.value)) all.add(cell.value); }));
+  for (const label of expected) assert.ok(all.has(label), `SA4W: falta ${label}`);
+});
+
 test('el libro de Excel se genera con las hojas, fórmulas y filtro de modelos', async () => {
   const sim = L.simulate({ ...BASE, program: read('programa.txt'), dump: read('dump.txt') });
   const all = L.buildWorkbook(ExcelJS, sim, {});
