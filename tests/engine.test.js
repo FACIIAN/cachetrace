@@ -85,7 +85,10 @@ test('el motor coincide con un modelo de referencia independiente en programas a
     const lines = [`li r4, ${1 + rng(4)}`];
     for (let k = 0; k < 2 + rng(6); k++) {
       const a = (0x100 + rng(Math.floor((top - 0x100) / 4)) * 4);
-      lines.push(`li r1, ${a}`, rng(2) ? 'lw r5, 0(r1)' : `sw r5, ${4 * rng(3)}(r1)`);
+      const kind = rng(6);
+      const op = ['lw', 'sw', 'lb', 'sb', 'lh', 'sh'][kind];
+      const size = [4, 4, 1, 1, 2, 2][kind];
+      lines.push(`li r1, ${a}`, `${op} r5, ${size * rng(3)}(r1)`);
     }
     lines.push('addi r4, r4, -1', 'bne r4, zero, 0x0004', 'nop');
     const policy = rng(2) ? 'LRU' : 'FIFO';
@@ -108,6 +111,47 @@ test('el motor coincide con un modelo de referencia independiente en programas a
   assert.ok(compared > 5000);
 });
 
+test('lb, lbu, lh, lhu: extensión de signo y desplazamiento opcional', () => {
+  const src = ['li r1, 0x1000', 'lb r2, (r1)', 'lbu r3, 0(r1)', 'lh r4, 2(r1)', 'lhu r5, 2(r1)', 'lw r6, 0(r1)', 'nop'].join('\n');
+  const sim = L.simulate({ ...BASE, program: src, dump: '0x1000: F0 00 00 80' });
+  assert.equal(sim.ok, true, sim.errors.join('\n'));
+  const r = sim.steps[sim.steps.length - 1].regs;
+  assert.deepEqual([r[2], r[3], r[4], r[5], r[6]], [0xFFFFFFF0, 0xF0, 0xFFFF8000, 0x8000, 0x800000F0]);
+});
+
+test('sb y sh solo modifican los bytes afectados de la línea y la dejan sucia', () => {
+  const src = ['li r1, 0x1002', 'addi r2, r1, 0x1001', 'lb r10, (r1)', 'sb r10, (r2)', 'li r3, 0xBEEF', 'li r4, 0x2004', 'sh r3, 0(r4)', 'nop'].join('\n');
+  const dump = '0x1000: 00 11 22 33 44 55 66 77\n0x2000: 88 99 AA BB CC DD EE FF';
+  const sim = L.simulate({ ...BASE, program: src, dump });
+  assert.equal(sim.ok, true, sim.errors.join('\n'));
+  const dm = model(sim, 'DM');
+  const line = dm.finalSnap[dm.finalSnap.findIndex((l) => l.valid && l.tag === 0x40)];
+  assert.equal(line.dirty, 1);
+  // byte 3 holds 0x22 (stored by sb); bytes 4 and 5 hold the half-word 0xBEEF in little-endian order (EF BE)
+  assert.deepEqual([...L.wordBytes(line.words[0]), ...L.wordBytes(line.words[1])], ['88', '99', 'AA', '22', 'EF', 'BE', 'EE', 'FF']);
+  // earlier states are not modified by later writes to the same line
+  const first = dm.rows.find((r) => r.phase === 'Execute' && r.addr === 0x2003);
+  assert.deepEqual(L.wordBytes(first.snap[first.changedLine].words[0]), ['88', '99', 'AA', '22']);
+});
+
+test('los accesos de byte y media palabra exigen su alineación', () => {
+  assert.match(L.simulate({ ...BASE, program: 'li r1, 0x1001\nlh r2, 0(r1)', dump: '' }).errors[0], /media palabra/);
+  assert.equal(L.simulate({ ...BASE, program: 'li r1, 0x1001\nlb r2, 0(r1)\nnop', dump: '' }).ok, true);
+});
+
+test('el límite de instrucciones detiene un bucle sin salida y lo avisa', () => {
+  const src = 'li r1, 5\nloop: addi r1, r1, 1\nbeq r1, r1, 0x0004\nnop';
+  const sim = L.simulate({ ...BASE, maxSteps: 9, program: src, dump: '' });
+  assert.equal(sim.ok, true);
+  assert.equal(sim.steps.length, 9);
+  assert.equal(sim.stop, 'limite');
+  assert.match(sim.warnings[0], /límite de 9 instrucciones/);
+});
+
+test('un registro donde se espera un inmediato da un mensaje claro', () => {
+  assert.match(L.simulate({ ...BASE, program: 'addi r1, r1, r11', dump: '' }).errors[0], /es un registro/);
+});
+
 test('el libro de Excel se genera con las hojas, fórmulas y filtro de modelos', async () => {
   const sim = L.simulate({ ...BASE, program: read('programa.txt'), dump: read('dump.txt') });
   const all = L.buildWorkbook(ExcelJS, sim, {});
@@ -121,6 +165,10 @@ test('el libro de Excel se genera con las hojas, fórmulas y filtro de modelos',
   const some = L.buildWorkbook(ExcelJS, sim, { models: ['SA2W', 'FA'], evolution: false });
   assert.deepEqual(some.worksheets.map((w) => w.name), ['SA2W', 'FA', 'Enunciado']);
   assert.throws(() => L.buildWorkbook(ExcelJS, sim, { models: [] }), /al menos un tipo/);
+
+  const seq = L.buildWorkbook(ExcelJS, sim, { models: ['DM'], evolution: false, insMode: 'seq' }).getWorksheet('Mapeo Directo(DM)');
+  assert.equal(seq.getCell('A2').value, 0);
+  assert.equal(seq.getCell('A4').value, 1);
 
   const buf = await all.xlsx.writeBuffer();
   assert.ok(buf.byteLength > 10000);

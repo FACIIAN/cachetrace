@@ -55,10 +55,13 @@ const CacheLab = (function () {
     li: 'ri', mv: 'rr',
     add: 'rrr', sub: 'rrr', mul: 'rrr', and: 'rrr', or: 'rrr', xor: 'rrr', sll: 'rrr', srl: 'rrr',
     addi: 'rri', subi: 'rri', andi: 'rri', ori: 'rri', slli: 'rri', srli: 'rri',
-    lw: 'rm', sw: 'rm',
+    lw: 'rm', sw: 'rm', lb: 'rm', lbu: 'rm', lh: 'rm', lhu: 'rm', sb: 'rm', sh: 'rm',
     beq: 'rrl', bne: 'rrl', blt: 'rrl', bge: 'rrl', ble: 'rrl', bgt: 'rrl',
     beqz: 'rl', bnez: 'rl', j: 'l', nop: '', halt: '',
   };
+
+  const MEM_SIZE = { lw: 4, sw: 4, lb: 1, lbu: 1, sb: 1, lh: 2, lhu: 2, sh: 2 };
+  const SIZE_NAME = { 1: 'byte', 2: 'media palabra (2 bytes)', 4: 'palabra (4 bytes)' };
 
   function parseReg(s) {
     if (/^zero$/i.test(String(s).trim())) return 0;
@@ -93,7 +96,12 @@ const CacheLab = (function () {
           if (r === null) { errors.push(`Línea ${lineNo}: "${a}" no es un registro válido (r0 a r31).`); bad = true; } else ins.r.push(r);
         } else if (t === 'i') {
           const v = parseNum(a, defBase);
-          if (isNaN(v)) { errors.push(`Línea ${lineNo}: "${a}" no es un número válido.`); bad = true; } else ins.imm = v;
+          if (isNaN(v)) {
+            errors.push(parseReg(a) !== null
+              ? `Línea ${lineNo}: "${a}" es un registro, pero "${op}" espera un número como último operando (para operar con registros usa add, sub, and...).`
+              : `Línea ${lineNo}: "${a}" no es un número válido.`);
+            bad = true;
+          } else ins.imm = v;
         } else if (t === 'm') {
           const mo = a.match(/^(.*)\(\s*(\S+?)\s*\)$/);
           const r = mo ? parseReg(mo[2]) : null;
@@ -180,12 +188,22 @@ const CacheLab = (function () {
         case 'ori': w = a; val = (regs[b] | ins.imm) >>> 0; break;
         case 'slli': w = a; val = (regs[b] << (ins.imm & 31)) >>> 0; break;
         case 'srli': w = a; val = regs[b] >>> (ins.imm & 31); break;
-        case 'lw': case 'sw': {
+        case 'lw': case 'sw': case 'lb': case 'lbu': case 'lh': case 'lhu': case 'sb': case 'sh': {
+          const size = MEM_SIZE[ins.op];
           const addr = (regs[b] + ins.imm) >>> 0;
-          if (addr >= memSize) throw new Error(`Instrucción "${ins.text}" (línea ${ins.line}): la dirección ${H(addr)} queda fuera de la memoria (bus de ${cfg.addrBits} bits).`);
-          if (addr % 4) throw new Error(`Instrucción "${ins.text}" (línea ${ins.line}): la dirección ${H(addr)} no está alineada a palabra.`);
-          if (ins.op === 'lw') { val = leWord(mem, addr); w = a; st.access = { kind: 'R', addr, value: val }; }
-          else { val = regs[a]; leBytes(val).forEach((bv, k) => mem.set(addr + k, bv)); st.access = { kind: 'W', addr, value: val }; }
+          if (addr + size > memSize) throw new Error(`Instrucción "${ins.text}" (línea ${ins.line}): la dirección ${H(addr)} queda fuera de la memoria (bus de ${cfg.addrBits} bits).`);
+          if (addr % size) throw new Error(`Instrucción "${ins.text}" (línea ${ins.line}): la dirección ${H(addr)} no está alineada a ${SIZE_NAME[size]}.`);
+          if (ins.op[0] === 'l') {
+            let raw = 0;
+            for (let k = size - 1; k >= 0; k--) raw = raw * 256 + (mem.get(addr + k) || 0);
+            if (ins.op === 'lb') raw = (raw << 24) >> 24;
+            else if (ins.op === 'lh') raw = (raw << 16) >> 16;
+            val = raw >>> 0; w = a; st.access = { kind: 'R', addr, size, value: val };
+          } else {
+            val = regs[a];
+            for (let k = 0; k < size; k++) mem.set(addr + k, (val >>> (8 * k)) & 255);
+            st.access = { kind: 'W', addr, size, value: size === 4 ? val : val & (Math.pow(2, 8 * size) - 1) };
+          }
           break;
         }
         case 'beq': if (regs[a] === regs[b]) next = ins.target; break;
@@ -234,7 +252,7 @@ const CacheLab = (function () {
     };
     let lastSnap = snap();
 
-    function access(addr, isWrite, value) {
+    function access(addr, isWrite, value, size) {
       clock++;
       const offset = addr % B;
       const set = Math.floor(addr / B) % g.sets;
@@ -269,7 +287,14 @@ const CacheLab = (function () {
       }
       const l = lines[base + way];
       l.stamp = clock;
-      if (isWrite) { l.words[Math.floor(offset / 4)] = { t: 'd', b: leBytes(value >>> 0) }; l.dirty = 1; }
+      if (isWrite) {
+        for (let k = 0; k < size; k++) {
+          const at = offset + k, wi = Math.floor(at / 4), bi = at % 4;
+          const wd = l.words[wi];
+          if (wd && wd.t === 'd') { const nb = wd.b.slice(); nb[bi] = (value >>> (8 * k)) & 255; l.words[wi] = { t: 'd', b: nb }; }
+        }
+        l.dirty = 1;
+      }
       res.line = base + way;
       res.blockBase = addr - offset;
       stats.accesses++;
@@ -284,8 +309,9 @@ const CacheLab = (function () {
       else parts.push(`Trae el bloque ${rng} a ${lineLabel(r.line)}`);
       if (r.evict) parts.push(`desaloja el bloque ${H(r.evict.victimBase, hexD)} de ${lineLabel(r.evict.line)}${r.evict.dirty ? ' (sucio: write-back a memoria)' : ' (limpio: no se escribe)'}`);
       if (phase === 'Execute') {
-        if (st.access.kind === 'R') parts.push(`r${st.changed} ← ${H(st.access.value)}`);
-        else parts.push(`M[${H(st.access.addr, hexD)}] ← ${H(st.access.value)}, D=1`);
+        const vd = st.access.size === 4 ? 4 : 2 * st.access.size;
+        if (st.access.kind === 'R') parts.push(`r${st.changed} ← ${H(st.access.value, vd)}`);
+        else parts.push(`M[${H(st.access.addr, hexD)}] ← ${H(st.access.value, vd)}, D=1`);
       }
       return parts.join('; ');
     };
@@ -293,7 +319,7 @@ const CacheLab = (function () {
     steps.forEach((st, si) => {
       const doRow = (phase, acc) => {
         if (!acc) { rows.push({ step: si, ins: st.i, text: st.text, phase, empty: true, snap: lastSnap, changedLine: -1 }); return; }
-        const r = access(acc.addr, acc.kind === 'W', acc.value);
+        const r = access(acc.addr, acc.kind === 'W', acc.value, acc.size || 4);
         const isF = phase === 'Fetch';
         if (isF) { r.hit ? stats.fetchHits++ : stats.fetchMisses++; } else { r.hit ? stats.dataHits++ : stats.dataMisses++; }
         lastSnap = snap();
@@ -326,7 +352,7 @@ const CacheLab = (function () {
     let cpu;
     try { cpu = runCPU(P.prog, D.mem, cfg); } catch (e) { return { ok: false, errors: [e.message], warnings: P.warnings }; }
     const warnings = P.warnings.slice();
-    if (cpu.stop === 'limite') warnings.push(`La ejecución se ha detenido tras ${cfg.maxSteps} instrucciones (posible bucle infinito).`);
+    if (cpu.stop === 'limite') warnings.push(`La ejecución se ha detenido al llegar al límite de ${cfg.maxSteps} instrucciones ejecutadas (se puede cambiar en Opciones avanzadas). Es lo esperado si el programa tiene un bucle sin salida.`);
     const models = MODELS.map((m) => runCache(m, cfg, P.prog, cpu.steps, D.mem));
     const used = new Set();
     P.prog.forEach((ins) => ins.r.forEach((r) => { if (r > 0) used.add(r); }));
@@ -352,6 +378,7 @@ const CacheLab = (function () {
     const font = { name: 'Arial', size: 10 };
     const fillOf = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
     const B = cfg.lineBytes, W = B / 4;
+    const insMode = opts.insMode || (opts.insText === false ? 'num' : 'text');
 
     const writeLineRow = (ws, row, col0, ln) => {
       // D0..D(B-1) start at col0. Data words use one cell per byte; instruction words are merged over their 4 bytes.
@@ -397,7 +424,7 @@ const CacheLab = (function () {
         cell.alignment = { horizontal: col >= 4 && col <= 3 + nb ? 'center' : undefined, vertical: 'bottom' };
         cell.border = { top: thin, left: thin, right: thin };
       }
-      ws.getColumn(1).width = opts.insText === false ? 8 : 22;
+      ws.getColumn(1).width = insMode === 'text' ? 22 : 8;
       ws.getColumn(2).width = 9;
       ws.getColumn(3).width = 10;
       for (let k = 0; k < nb; k++) ws.getColumn(bitCol(k)).width = 4.3;
@@ -414,8 +441,8 @@ const CacheLab = (function () {
         const r1 = r, r2 = r + 1;
         ws.mergeCells(r1, 1, r2, 1);
         const a = ws.getCell(r1, 1);
-        a.value = opts.insText === false ? pair[0].ins : pair[0].text;
-        a.font = { ...font, bold: opts.insText !== false };
+        a.value = insMode === 'text' ? pair[0].text : insMode === 'seq' ? pair[0].step : pair[0].ins;
+        a.font = { ...font, bold: insMode === 'text' };
         a.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         a.border = { left: med, top: med, bottom: thin, right: thin };
         ws.getCell(r2, 1).border = { left: med, bottom: thin, right: thin };

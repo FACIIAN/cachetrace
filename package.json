@@ -1,6 +1,6 @@
 {
   "name": "cachetrace",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Simulador de memoria caché (mapeo directo, SA2W, SA4W y totalmente asociativa) con exportación a Excel",
   "scripts": {
     "build": "node scripts/build.js",

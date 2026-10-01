@@ -14,7 +14,7 @@ CacheTrace replays, access by access, the execution of a program on four cache o
 | Replacement | LRU (default) or FIFO. |
 | Unprefixed numbers | Base of literals without `0x` in the program (decimal by default). |
 | Start address | Address of the first instruction (default `0x0000`). |
-| Maximum instructions | Safety limit against infinite loops (300 by default). |
+| Stop after (executed instructions) | Maximum number of executed instructions (300 by default). It stops loops without an exit, such as `beq r1, r1, target`, and lets you reproduce statements that ask for a specific number of instructions. |
 | Stop at `nop` | Execution ends on reaching `nop`, after its Fetch. Enabled by default. |
 
 ### Bit split
@@ -37,7 +37,9 @@ One instruction per line. Every instruction takes 4 bytes and the first one is l
 | `mv` | `mv rd, rs` |
 | `add sub mul and or xor sll srl` | `op rd, rs1, rs2` |
 | `addi subi andi ori slli srli` | `op rd, rs, imm` |
-| `lw`, `sw` | `lw rd, off(rs)` · `sw rs2, off(rs1)` |
+| `lw`, `sw` | `lw rd, off(rs)` · `sw rs2, off(rs1)` (word, 4 bytes) |
+| `lh`, `lhu`, `sh` | half-word (2 bytes); `lh` sign-extends, `lhu` does not |
+| `lb`, `lbu`, `sb` | byte; `lb` sign-extends, `lbu` does not |
 | `beq bne blt bge ble bgt` | `op rs1, rs2, target` (signed comparisons) |
 | `beqz bnez` | `op rs, target` |
 | `j` | `j target` |
@@ -46,7 +48,9 @@ One instruction per line. Every instruction takes 4 bytes and the first one is l
 - Registers `r0` to `r31`. `zero` is an alias of `r0`, which is always 0.
 - A jump target is a label or an address (`0x0010`) that must match an instruction of the program.
 - Immediates accept decimal, `0x` (hexadecimal) and `0b` (binary), signed.
-- `lw` and `sw` access 32-bit words and require a 4-byte-aligned address inside the memory.
+- The offset may be omitted: `lb r10, (r1)` is the same as `lb r10, 0(r1)`.
+- Memory instructions require an address inside the memory and aligned to their size (4, 2 or 1 bytes). A byte or half-word access only changes those bytes of the line.
+- Immediate operands (`addi`, `andi`…) must be numbers; to operate on registers use `add`, `sub`, `and`…
 
 ## Memory dump
 
@@ -60,7 +64,7 @@ With that line, `lw` at `0x1000` reads `0x00000011` and at `0x1004` reads `0x000
 
 ## Model conventions
 
-- **Accesses.** Every executed instruction produces a Fetch at its address. `lw` and `sw` also produce a data access (Execute phase). Other instructions leave the Execute row without an address.
+- **Accesses.** Every executed instruction produces a Fetch at its address. Memory instructions (`lw`, `lb`, `sb`…) also produce a data access (Execute phase). Other instructions leave the Execute row without an address.
 - **Unified cache** for instructions and data, initially empty (V = 0).
 - **Writes.** Write-back with write-allocate. A `sw` to a present line marks it dirty (D = 1); on a miss the block is fetched first and then written. Evicting a dirty line writes its block back to memory (WB = Yes).
 - **Replacement.** Among the invalid ways of the set, the lowest-numbered one is chosen. If all are valid, LRU picks the least recently used (a hit updates the usage) and FIFO the one loaded earliest.
@@ -91,7 +95,6 @@ You can choose which organizations to export. The workbooks open in Excel and Li
 
 ## Limitations
 
-- Only 32-bit word accesses; there is no `lb`, `sb` or half-word support.
 - Fixed write policy (write-back with write-allocate) and LRU or FIFO replacement. No write-through, no-write-allocate or random replacement.
 - A single unified cache; no split instruction/data caches, multiple levels or timing (AMAT, cycles).
 - Writes into the program area do not modify the instructions.

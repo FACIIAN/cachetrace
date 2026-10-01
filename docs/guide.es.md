@@ -14,7 +14,7 @@ CacheTrace reproduce, acceso a acceso, la ejecución de un programa sobre cuatro
 | Reemplazo | LRU (por defecto) o FIFO. |
 | Números sin prefijo | Base de los literales sin `0x` en el programa (decimal por defecto). |
 | Dirección inicial | Dirección de la primera instrucción (por defecto `0x0000`). |
-| Máximo de instrucciones | Límite de seguridad ante bucles infinitos (300 por defecto). |
+| Parar tras (instrucciones ejecutadas) | Número máximo de instrucciones ejecutadas (300 por defecto). Detiene los bucles sin salida, como `beq r1, r1, destino`, y sirve para reproducir enunciados que piden ejecutar un número concreto de instrucciones. |
 | Terminar en `nop` | La ejecución acaba al alcanzar `nop`, tras su Fetch. Activado por defecto. |
 
 ### Reparto de bits
@@ -37,7 +37,9 @@ Una instrucción por línea. Cada instrucción ocupa 4 bytes y la primera se car
 | `mv` | `mv rd, rs` |
 | `add sub mul and or xor sll srl` | `op rd, rs1, rs2` |
 | `addi subi andi ori slli srli` | `op rd, rs, imm` |
-| `lw`, `sw` | `lw rd, desp(rs)` · `sw rs2, desp(rs1)` |
+| `lw`, `sw` | `lw rd, desp(rs)` · `sw rs2, desp(rs1)` (palabra, 4 bytes) |
+| `lh`, `lhu`, `sh` | media palabra (2 bytes); `lh` extiende el signo y `lhu` no |
+| `lb`, `lbu`, `sb` | byte; `lb` extiende el signo y `lbu` no |
 | `beq bne blt bge ble bgt` | `op rs1, rs2, destino` (comparaciones con signo) |
 | `beqz bnez` | `op rs, destino` |
 | `j` | `j destino` |
@@ -46,7 +48,9 @@ Una instrucción por línea. Cada instrucción ocupa 4 bytes y la primera se car
 - Registros `r0` a `r31`. `zero` es un alias de `r0`, que vale siempre 0.
 - El destino de un salto es una etiqueta o una dirección (`0x0010`), que debe corresponder a una instrucción del programa.
 - Los inmediatos admiten decimal, `0x` (hexadecimal) y `0b` (binario), con signo.
-- `lw` y `sw` acceden a palabras de 32 bits y exigen dirección alineada a 4 y dentro de la memoria.
+- El desplazamiento puede omitirse: `lb r10, (r1)` equivale a `lb r10, 0(r1)`.
+- Las instrucciones de memoria exigen una dirección dentro de la memoria y alineada a su tamaño (4, 2 o 1 bytes). Un acceso de byte o de media palabra solo modifica esos bytes de la línea.
+- Los operandos inmediatos (`addi`, `andi`…) deben ser números; para operar con registros usa `add`, `sub`, `and`…
 
 ## Dump de memoria
 
@@ -60,7 +64,7 @@ Con esa línea, `lw` en `0x1000` lee `0x00000011` y en `0x1004` lee `0x00000022`
 
 ## Convenciones del modelo
 
-- **Accesos.** Cada instrucción ejecutada genera un Fetch en su dirección. `lw` y `sw` generan además un acceso de datos (fase Execute). El resto de instrucciones deja la fila Execute sin dirección.
+- **Accesos.** Cada instrucción ejecutada genera un Fetch en su dirección. Las instrucciones de memoria (`lw`, `lb`, `sb`…) generan además un acceso de datos (fase Execute). El resto de instrucciones deja la fila Execute sin dirección.
 - **Caché unificada** para instrucciones y datos, inicialmente vacía (V = 0).
 - **Escritura.** Write-back con write-allocate. Un `sw` sobre una línea presente la marca como sucia (D = 1); en un fallo, se trae el bloque y luego se escribe. Al desalojar una línea sucia se escribe su bloque en memoria (WB = Sí).
 - **Reemplazo.** Entre las vías inválidas del conjunto se elige la de menor número. Si todas son válidas, LRU elige la menos recientemente usada (un acierto actualiza el uso) y FIFO la que se cargó antes.
@@ -91,7 +95,6 @@ Puedes elegir qué organizaciones exportar. Los libros se abren con Excel y Libr
 
 ## Limitaciones
 
-- Solo accesos de palabra de 32 bits; no hay `lb`, `sb` ni medias palabras.
 - Política de escritura fija (write-back con write-allocate) y reemplazo LRU o FIFO. No hay write-through, no-write-allocate ni reemplazo aleatorio.
 - Caché única unificada; no modela cachés separadas de instrucciones y datos, niveles múltiples ni tiempos (AMAT, ciclos).
 - Las escrituras a la zona del programa no modifican las instrucciones.

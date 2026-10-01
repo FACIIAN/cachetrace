@@ -190,7 +190,7 @@ table.regs tr.chg td { background: var(--chg); }
         <div class="body stack">
           <div class="row2">
             <div class="field"><label for="progBase">Dirección inicial del programa</label><input id="progBase" type="text" value="0x0000" spellcheck="false"></div>
-            <div class="field"><label for="maxSteps">Máximo de instrucciones</label><input id="maxSteps" type="number" min="1" max="2000" value="300"></div>
+            <div class="field"><label for="maxSteps">Parar tras (instrucciones ejecutadas)</label><input id="maxSteps" type="number" min="1" max="2000" value="300"></div>
           </div>
           <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink)"><input type="checkbox" id="stopNop" checked> La ejecución termina al alcanzar <code>nop</code></label>
         </div>
@@ -206,8 +206,8 @@ table.regs tr.chg td { background: var(--chg); }
       <details>
         <summary>Instrucciones admitidas</summary>
         <div class="body">
-          <p><code>li mv add sub mul and or xor sll srl addi subi andi ori slli srli lw sw beq bne blt bge ble bgt beqz bnez j nop halt</code></p>
-          <p style="margin-top:6px">Registros <code>r0</code> a <code>r31</code>; <code>zero</code> es un alias de <code>r0</code>, que vale siempre 0. Cada instrucción ocupa 4 bytes y genera un Fetch. Solo <code>lw</code> y <code>sw</code> añaden una fila Execute con su acceso a datos; en el resto la fila Execute queda sin dirección.</p>
+          <p><code>li mv add sub mul and or xor sll srl addi subi andi ori slli srli lw sw lh lhu lb lbu sh sb beq bne blt bge ble bgt beqz bnez j nop halt</code></p>
+          <p style="margin-top:6px">Registros <code>r0</code> a <code>r31</code>; <code>zero</code> es un alias de <code>r0</code>, que vale siempre 0. Cada instrucción ocupa 4 bytes y genera un Fetch. Las instrucciones de memoria (<code>lw</code>, <code>lb</code>, <code>sb</code>…) añaden una fila Execute con su acceso a datos; en el resto la fila Execute queda sin dirección. El desplazamiento puede omitirse: <code>lb r10, (r1)</code>.</p>
         </div>
       </details>
     </section>
@@ -252,7 +252,7 @@ table.regs tr.chg td { background: var(--chg); }
           <div class="results-head">
             <div class="tabs" role="tablist" aria-label="Tipo de caché" id="tabs"></div>
             <div class="xl">
-              <label>INS# como <select id="optIns"><option value="text">texto</option><option value="num">número</option></select></label>
+              <label>INS# como <select id="optIns"><option value="text">texto</option><option value="num">nº de instrucción</option><option value="seq">orden de ejecución</option></select></label>
               <span class="lbl" style="font-weight:500">Exportar:</span>
               <label><input type="checkbox" class="optModel" value="DM" checked> DM</label>
               <label><input type="checkbox" class="optModel" value="SA2W" checked> SA2W</label>
@@ -409,7 +409,7 @@ table.regs tr.chg td { background: var(--chg); }
   /* ---------- trace ---------- */
   function renderTrace() {
     const mr = cur(), g = mr.geo, nb = S.sim.cfg.addrBits;
-    const numMode = $('#optIns').value === 'num';
+    const insMode = $('#optIns').value;
     const hasIdx = g.idx > 0;
     let h = '<thead><tr><th>INS#</th><th>FASE</th><th>DIR#</th>';
     for (let k = nb - 1; k >= 0; k--) h += `<th>${k}</th>`;
@@ -418,7 +418,7 @@ table.regs tr.chg td { background: var(--chg); }
     mr.rows.forEach((row, i) => {
       const first = row.phase === 'Fetch';
       h += `<tr class="${first ? 'first' : ''}" data-step="${row.step}" tabindex="0">`;
-      if (first) h += `<td class="ins" rowspan="2">${numMode ? row.ins : '<span class="n">' + row.ins + '</span>' + esc(row.text)}</td>`;
+      if (first) h += `<td class="ins" rowspan="2">${insMode === 'num' ? row.ins : insMode === 'seq' ? row.step : '<span class="n">' + row.ins + '</span>' + esc(row.text)}</td>`;
       h += `<td class="phase">${row.phase}</td>`;
       if (row.empty) {
         h += '<td></td>';
@@ -519,7 +519,7 @@ table.regs tr.chg td { background: var(--chg); }
     try {
       const models = Array.from(document.querySelectorAll('.optModel:checked')).map((c) => c.value);
       if (!models.length) { toast('Selecciona al menos un tipo de caché para exportar.'); return; }
-      const wb = L.buildWorkbook(window.ExcelJS, S.sim, { evolution: $('#optEvo').checked, insText: $('#optIns').value === 'text', models });
+      const wb = L.buildWorkbook(window.ExcelJS, S.sim, { evolution: $('#optEvo').checked, insMode: $('#optIns').value, models });
       const buf = await wb.xlsx.writeBuffer();
       blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     } catch (e) { toast('No se ha podido generar el Excel: ' + (e.message || e)); return; }

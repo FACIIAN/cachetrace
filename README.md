@@ -25,7 +25,7 @@ Everything runs in your browser. There is no server, no account, and nothing you
 - Direct-mapped, 2-way (SA2W), 4-way (SA4W) and fully associative (FA) caches for the same program.
 - Bit split derived from the address bus, the cache size and the bytes per line, with fixed colours: tag, index and offset.
 - Fetch and Execute per instruction (`lw` and `sw` add their data access), with step-by-step navigation.
-- RISC-style programs with loops: `li`, `lw`, `sw`, `addi`, `bne`… labels or addresses as jump targets, `zero` register.
+- RISC-style programs with loops: `li`, `lw`, `lb`, `sb`, `addi`, `bne`… byte, half-word and word accesses; labels or addresses as jump targets; `zero` register.
 - Memory dump byte by byte in hexadecimal; 32-bit words in little-endian.
 - Write-back with write-allocate; LRU or FIFO replacement; invalid lines are filled in order.
 - Excel export with one sheet per cache, bit formulas, final state, registers, and optional evolution sheets.
@@ -73,7 +73,7 @@ Result over 29 accesses:
 
 ### Conventions and limitations
 
-CacheTrace always applies the same rules: unified cache, initially empty; write-back with write-allocate; LRU (or FIFO), taking invalid lines first in ascending order; 32-bit words in little-endian; execution ends at `nop`. It only models word accesses and a fixed write policy, and it is a study tool: check the results against your own problem statement. See the [technical guide](docs/guide.en.md) for the details.
+CacheTrace always applies the same rules: unified cache, initially empty; write-back with write-allocate; LRU (or FIFO), taking invalid lines first in ascending order; 32-bit words in little-endian; execution ends at `nop`. It models a fixed write policy, and it is a study tool: check the results against your own problem statement. See the [technical guide](docs/guide.en.md) for the details.
 
 ### Development
 
@@ -106,7 +106,7 @@ Todo se ejecuta en tu navegador. No hay servidor ni cuentas, y nada de lo que in
 - Mapeo directo, asociativa de 2 vías (SA2W), de 4 vías (SA4W) y totalmente asociativa (FA) para el mismo programa.
 - Reparto de bits calculado a partir del bus, el tamaño de la caché y los bytes por línea, con colores fijos: tag, index y offset.
 - Fetch y Execute por instrucción (`lw` y `sw` añaden su acceso a datos), con navegación paso a paso.
-- Programas tipo RISC con bucles: `li`, `lw`, `sw`, `addi`, `bne`… etiquetas o direcciones como destino de salto, registro `zero`.
+- Programas tipo RISC con bucles: `li`, `lw`, `lb`, `sb`, `addi`, `bne`… accesos de byte, media palabra y palabra; etiquetas o direcciones como destino de salto; registro `zero`.
 - Dump de memoria byte a byte en hexadecimal; palabras de 32 bits en little-endian.
 - Write-back con write-allocate; reemplazo LRU o FIFO; las líneas inválidas se ocupan por orden.
 - Exportación a Excel con una hoja por caché, fórmulas para los bits, estado final, registros y hojas de evolución opcionales.
@@ -122,7 +122,7 @@ La entrada de arriba (bus de 16 bits, caché de 128 B, líneas de 8 B) está en 
 
 ### Convenciones y limitaciones
 
-CacheTrace aplica siempre las mismas reglas: caché unificada, inicialmente vacía; write-back con write-allocate; LRU (o FIFO), tomando primero las líneas inválidas en orden ascendente; palabras de 32 bits en little-endian; la ejecución termina en `nop`. Solo modela accesos de palabra y una política de escritura fija, y es una herramienta de estudio: contrasta los resultados con tu enunciado. Los detalles están en la [guía técnica](docs/guide.es.md).
+CacheTrace aplica siempre las mismas reglas: caché unificada, inicialmente vacía; write-back con write-allocate; LRU (o FIFO), tomando primero las líneas inválidas en orden ascendente; palabras de 32 bits en little-endian; la ejecución termina en `nop`. Modela una política de escritura fija, y es una herramienta de estudio: contrasta los resultados con tu enunciado. Los detalles están en la [guía técnica](docs/guide.es.md).
 
 ### Desarrollo
 

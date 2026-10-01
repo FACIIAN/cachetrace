@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-02
+
+### Added
+- Byte and half-word memory instructions: `lb`, `lbu`, `lh`, `lhu`, `sb`, `sh`. A sub-word store only changes the affected bytes of the cache line.
+- The offset of memory instructions can be omitted (`lb r10, (r1)`).
+- `INS#` can also be shown as the execution order (the dynamic instruction count) in the table and in the Excel export.
+- A clearer error when a register is used where an immediate is expected (`addi r1, r1, r11`).
+
+### Changed
+- The instruction limit is described as "Stop after N executed instructions" and its notice no longer suggests an error.
+
 ## [1.0.0] - 2026-09-30
 
 First public release.
