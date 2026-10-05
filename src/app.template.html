@@ -56,6 +56,8 @@ header.top p { color: var(--muted); max-width: 70ch; }
 .field label, .lbl { font-size: 13px; font-weight: 500; }
 .field .hint { font-size: 12.5px; color: var(--muted); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.size { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.size select { width: auto; padding-left: 6px; padding-right: 6px; }
 input[type=text], input[type=number], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--field); border-radius: 7px; padding: 7px 9px; }
 textarea { font-family: var(--mono); font-size: 13px; line-height: 1.45; resize: vertical; min-height: 120px; white-space: pre; overflow: auto; }
 input[type=text], input[type=number] { font-family: var(--mono); font-size: 14px; }
@@ -174,11 +176,11 @@ table.regs tr.chg td { background: var(--chg); }
       <h2 id="h-mem">Memoria y caché</h2>
       <div class="row2">
         <div class="field"><label for="bits">Bus de direcciones (bits)</label><input id="bits" type="number" min="6" max="32" value="16"></div>
-        <div class="field"><label for="mem">Memoria principal</label><input id="mem" type="text" value="64 KB" spellcheck="false"></div>
+        <div class="field"><label for="mem">Memoria principal</label><div class="size"><input id="mem" type="text" inputmode="decimal" value="64" spellcheck="false"><select id="mem_u" aria-label="Unidad de la memoria principal"></select></div></div>
       </div>
       <div class="row2">
-        <div class="field"><label for="cacheB">Tamaño de la caché</label><input id="cacheB" type="text" value="128" spellcheck="false"></div>
-        <div class="field"><label for="lineB">Bytes por línea (B)</label><input id="lineB" type="text" value="8" spellcheck="false"></div>
+        <div class="field"><label for="cacheB">Tamaño de la caché</label><div class="size"><input id="cacheB" type="text" inputmode="decimal" value="128" spellcheck="false"><select id="cacheB_u" aria-label="Unidad del tamaño de la caché"></select></div></div>
+        <div class="field"><label for="lineB">Tamaño de línea (bloque)</label><div class="size"><input id="lineB" type="text" inputmode="decimal" value="8" spellcheck="false"><select id="lineB_u" aria-label="Unidad del tamaño de línea"></select></div></div>
       </div>
       <p class="note" id="lineinfo"></p>
       <div class="row2">
@@ -305,35 +307,45 @@ table.regs tr.chg td { background: var(--chg); }
   const S = { sim: null, tab: 'DM', pos: 0 };
 
   const EXAMPLE = {
-    bits: '16', mem: '64 KB', cacheB: '128', lineB: '8', policy: 'LRU', base: '10', progBase: '0x0000', maxSteps: '300',
+    bits: '16', mem: '64', mem_u: 'KB', cacheB: '128', cacheB_u: 'B', lineB: '8', lineB_u: 'B', policy: 'LRU', base: '10', progBase: '0x0000', maxSteps: '300',
     prog: 'li r1, 0x1000\nli r2, 0x2000\nli r3, 0x2080\nli r4, 2\nlw r5, 0(r1)\nlw r6, 0(r2)\nadd r7, r5, r6\nsw r7, 0(r3)\naddi r1, r1, 4\naddi r2, r2, 4\naddi r3, r3, 4\naddi r4, r4, -1\nbne r4, zero, 0x0010\nnop',
     dump: '0x1000: 11 00 00 00 22 00 00 00\n0x2000: 00 01 00 00 00 02 00 00\n0x2080: 00 00 00 00 00 00 00 00',
   };
-  const FIELDS = ['bits', 'mem', 'cacheB', 'lineB', 'policy', 'base', 'progBase', 'maxSteps', 'prog', 'dump'];
+  const SIZE_IDS = ['mem', 'cacheB', 'lineB'];
+  const FIELDS = ['bits', 'mem', 'mem_u', 'cacheB', 'cacheB_u', 'lineB', 'lineB_u', 'policy', 'base', 'progBase', 'maxSteps', 'prog', 'dump'];
 
   /* ---------- inputs ---------- */
   function parseSize(s) {
-    const m = String(s).trim().match(/^(\d+(?:\.\d+)?)\s*([kmg]?)b?$/i);
+    const m = String(s).trim().match(/^(\d+(?:\.\d+)?)\s*([kmg]?)\s*(?:i?b(?:ytes?)?)?$/i);
     if (!m) return NaN;
     const mult = { '': 1, k: 1024, m: 1048576, g: 1073741824 }[m[2].toLowerCase()];
     return Math.round(parseFloat(m[1]) * mult);
   }
-  function fmtSize(n) {
-    if (n >= 1073741824) return n / 1073741824 + ' GB';
-    if (n >= 1048576) return n / 1048576 + ' MB';
-    if (n >= 1024) return n / 1024 + ' KB';
-    return n + ' B';
+  const UNITS = [['B', 'bytes', 1], ['KB', 'Kbytes', 1024], ['MB', 'Mbytes', 1048576], ['GB', 'Gbytes', 1073741824]];
+  const UNIT_MULT = Object.fromEntries(UNITS.map(([k, , m]) => [k, m]));
+  SIZE_IDS.forEach((id) => { $('#' + id + '_u').innerHTML = UNITS.map(([k, label]) => `<option value="${k}">${label}</option>`).join(''); });
+  $('#mem_u').value = 'KB';
+  // Reads a size field: the number is multiplied by the selected unit. A number that already carries a unit ("64 KB") is accepted too.
+  function sizeOf(id) {
+    const raw = $('#' + id).value.trim().replace(',', '.');
+    if (/[a-z]/i.test(raw)) return parseSize(raw);
+    return /^\d+(\.\d+)?$/.test(raw) ? Math.round(parseFloat(raw) * UNIT_MULT[$('#' + id + '_u').value]) : NaN;
+  }
+  // Writes a size in bytes using the largest unit that represents it exactly.
+  function setSize(id, bytes) {
+    const [unit, , mult] = UNITS.slice().reverse().find(([, , m]) => bytes >= m && bytes % m === 0) || UNITS[0];
+    $('#' + id).value = String(bytes / mult); $('#' + id + '_u').value = unit;
   }
   function readCfg() {
     const pb = L.parseNum($('#progBase').value || '0', 16);
     return {
-      addrBits: parseInt($('#bits').value, 10), lineBytes: parseSize($('#lineB').value), cacheBytes: parseSize($('#cacheB').value),
+      addrBits: parseInt($('#bits').value, 10), lineBytes: sizeOf('lineB'), cacheBytes: sizeOf('cacheB'),
       policy: $('#policy').value, base: parseInt($('#base').value, 10), progBase: isNaN(pb) ? 0 : pb,
       maxSteps: parseInt($('#maxSteps').value, 10) || 300, stopAtNop: $('#stopNop').checked,
     };
   }
-  function save() { try { const o = {}; FIELDS.forEach((f) => { o[f] = $('#' + f).value; }); o.stopNop = $('#stopNop').checked ? '1' : '0'; localStorage.setItem('cachetrace-v1', JSON.stringify(o)); } catch (e) { /* storage may be empty or blocked */ } }
-  function load() { try { const raw = localStorage.getItem('cachetrace-v1'); if (!raw) return false; const o = JSON.parse(raw); FIELDS.forEach((f) => { if (typeof o[f] === 'string') $('#' + f).value = o[f]; }); if (typeof o.stopNop === 'string') $('#stopNop').checked = o.stopNop === '1'; return true; } catch (e) { return false; } }
+  function save() { try { const o = {}; FIELDS.forEach((f) => { o[f] = $('#' + f).value; }); o.stopNop = $('#stopNop').checked ? '1' : '0'; localStorage.setItem('cachetrace-v2', JSON.stringify(o)); } catch (e) { /* storage may be empty or blocked */ } }
+  function load() { try { const raw = localStorage.getItem('cachetrace-v2'); if (!raw) return false; const o = JSON.parse(raw); FIELDS.forEach((f) => { if (typeof o[f] === 'string') $('#' + f).value = o[f]; }); if (typeof o.stopNop === 'string') $('#stopNop').checked = o.stopNop === '1'; return true; } catch (e) { return false; } }
   function fill(o) { Object.keys(o).forEach((k) => { $('#' + k).value = o[k]; }); }
 
   /* ---------- bit ruler ---------- */
@@ -533,9 +545,10 @@ table.regs tr.chg td { background: var(--chg); }
   /* ---------- wiring ---------- */
   $('#run').addEventListener('click', () => run(true));
   $('#example').addEventListener('click', () => { fill(EXAMPLE); $('#stopNop').checked = true; renderRuler(); run(true); });
-  $('#bits').addEventListener('input', () => { const b = parseInt($('#bits').value, 10); if (b >= 1 && b <= 32) $('#mem').value = fmtSize(Math.pow(2, b)); renderRuler(); });
-  $('#mem').addEventListener('input', () => { const v = parseSize($('#mem').value); if (v > 1 && (v & (v - 1)) === 0) { $('#bits').value = Math.round(Math.log2(v)); } renderRuler(); });
-  ['cacheB', 'lineB'].forEach((id) => $('#' + id).addEventListener('input', renderRuler));
+  $('#bits').addEventListener('input', () => { const b = parseInt($('#bits').value, 10); if (b >= 1 && b <= 32) setSize('mem', Math.pow(2, b)); renderRuler(); });
+  const onMem = () => { const v = sizeOf('mem'); if (v > 1 && Math.log2(v) % 1 === 0 && v <= 4294967296) $('#bits').value = Math.log2(v); renderRuler(); };
+  ['mem', 'mem_u'].forEach((id) => ['input', 'change'].forEach((ev) => $('#' + id).addEventListener(ev, onMem)));
+  ['cacheB', 'cacheB_u', 'lineB', 'lineB_u'].forEach((id) => ['input', 'change'].forEach((ev) => $('#' + id).addEventListener(ev, renderRuler)));
   document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') run(true); });
 
   if (!load()) fill(EXAMPLE);

@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-10-04
+
+### Added
+- The main memory, cache and line sizes are entered as a number plus a unit selector (bytes, Kbytes, Mbytes, Gbytes), so "64" can no longer be mistaken for 64 bytes. The address bus and the memory size update each other.
+
+## [1.1.2] - 2026-10-04
+
+### Changed
+- The "cache larger than main memory" notice now shows the values it read (cache size, memory size and address bus) and reminds the units.
+- Sizes accept more spellings: `64 Kbytes`, `64KiB`, `128 bytes`.
+
 ## [1.1.1] - 2026-10-03
 
 ### Fixed

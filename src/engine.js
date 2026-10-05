@@ -35,7 +35,7 @@ const CacheLab = (function () {
     if (!isPow2(c.cacheBytes)) errs.push('El tamaño de la caché debe ser una potencia de 2.');
     if (isPow2(c.lineBytes) && isPow2(c.cacheBytes)) {
       if (c.cacheBytes < c.lineBytes * 4) errs.push('La caché necesita al menos 4 líneas para poder hacer la asociativa de 4 vías.');
-      if (c.cacheBytes > Math.pow(2, c.addrBits)) errs.push('La caché no puede ser mayor que la memoria principal.');
+      if (c.cacheBytes > Math.pow(2, c.addrBits)) errs.push(`La caché (${c.cacheBytes} bytes) no puede ser mayor que la memoria principal (${Math.pow(2, c.addrBits)} bytes, con un bus de ${c.addrBits} bits). Revisa el bus de direcciones y las unidades: 64 son 64 bytes, y 64 KB son 65536.`);
     }
     return errs;
   }
@@ -141,12 +141,14 @@ const CacheLab = (function () {
       if (isNaN(addr) || addr < 0) { errors.push(`Dump, línea ${ln + 1}: "${m[1]}" no es una dirección válida.`); return; }
       const vals = m[2].split(/[\s,|]+/).filter(Boolean);
       if (!vals.length) { errors.push(`Dump, línea ${ln + 1}: faltan los bytes.`); return; }
+      let outside = 0;
       vals.forEach((v, k) => {
         const n = parseNum(v, 16);
         if (isNaN(n) || n < 0 || n > 255) errors.push(`Dump, línea ${ln + 1}: "${v}" no es un byte hexadecimal válido (00 a FF).`);
-        else if (addr + k >= memSize) errors.push(`Dump, línea ${ln + 1}: la dirección ${H(addr + k)} queda fuera de la memoria.`);
+        else if (addr + k >= memSize) outside++;
         else mem.set(addr + k, n);
       });
+      if (outside) errors.push(`Dump, línea ${ln + 1}: ${outside === 1 ? 'una dirección queda' : outside + ' direcciones quedan'} fuera de la memoria (el bus llega hasta ${H(memSize - 1)}).`);
     });
     return { mem, errors };
   }
@@ -344,6 +346,7 @@ const CacheLab = (function () {
       progBase: input.progBase || 0, maxSteps: input.maxSteps || 300, stopAtNop: input.stopAtNop !== false,
     };
     const errors = checkConfig(cfg);
+    if (errors.length) return { ok: false, errors, warnings: [] }; // fix the memory and cache parameters first
     const P = parseProgram(input.program || '', cfg.base, cfg.progBase);
     const D = parseDump(input.dump || '', Math.pow(2, cfg.addrBits || 16));
     errors.push(...P.errors, ...D.errors);

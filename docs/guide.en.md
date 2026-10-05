@@ -9,8 +9,8 @@ CacheTrace replays, access by access, the execution of a program on four cache o
 | Field | Description |
 | --- | --- |
 | Address bus | Address width in bits (6 to 32). Sets the main memory size, `2^bits` bytes. |
-| Cache size | In bytes; suffixes are accepted (`128`, `1 KB`). Must be a power of two. |
-| Bytes per line (B) | Power of two, at least 4. The number of lines is `cache / B` and must be at least 4. |
+| Main memory, cache and line size | Each one is a number and a unit (bytes, Kbytes, Mbytes or Gbytes; 1 Kbyte = 1024 bytes). Sizes must be powers of two. The address bus and the main memory are computed from each other. |
+| Line size (B) | In bytes or another unit; power of two, at least 4 bytes. The number of lines is `cache / B` and must be at least 4. |
 | Replacement | LRU (default) or FIFO. |
 | Unprefixed numbers | Base of literals without `0x` in the program (decimal by default). |
 | Start address | Address of the first instruction (default `0x0000`). |

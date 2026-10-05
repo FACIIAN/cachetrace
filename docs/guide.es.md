@@ -9,8 +9,8 @@ CacheTrace reproduce, acceso a acceso, la ejecución de un programa sobre cuatro
 | Campo | Descripción |
 | --- | --- |
 | Bus de direcciones | Ancho de la dirección en bits (6 a 32). Define el tamaño de la memoria principal, `2^bits` bytes. |
-| Tamaño de la caché | En bytes; acepta sufijos (`128`, `1 KB`). Debe ser potencia de 2. |
-| Bytes por línea (B) | Potencia de 2, mínimo 4. El número de líneas es `caché / B` y debe ser al menos 4. |
+| Memoria principal, caché y línea | Cada uno se escribe como un número y una unidad (bytes, Kbytes, Mbytes o Gbytes; 1 Kbyte = 1024 bytes). Los tamaños deben ser potencias de 2. El bus y la memoria principal se calculan el uno al otro. |
+| Tamaño de línea (B) | En bytes u otra unidad; potencia de 2, mínimo 4 bytes. El número de líneas es `caché / B` y debe ser al menos 4. |
 | Reemplazo | LRU (por defecto) o FIFO. |
 | Números sin prefijo | Base de los literales sin `0x` en el programa (decimal por defecto). |
 | Dirección inicial | Dirección de la primera instrucción (por defecto `0x0000`). |

@@ -46,6 +46,12 @@ test('reparto de bits para 16 bits, caché de 128 B y líneas de 8 B', () => {
   assert.deepEqual(bits, { DM: [9, 4, 3], SA2W: [10, 3, 3], SA4W: [11, 2, 3], FA: [13, 0, 3] });
 });
 
+test('el aviso de caché mayor que la memoria muestra los valores leídos', () => {
+  const e = L.checkConfig({ addrBits: 6, lineBytes: 8, cacheBytes: 128 });
+  assert.match(e.join(' '), /128 bytes.*64 bytes.*6 bits/);
+  assert.deepEqual(L.checkConfig({ addrBits: 16, lineBytes: 8, cacheBytes: 128 }), []);
+});
+
 test('el programa admite zero, inmediatos negativos, etiquetas y saltos a dirección', () => {
   const byLabel = L.simulate({ ...BASE, program: 'li r4, 3\nloop: addi r4, r4, -1\nbne r4, zero, loop\nnop', dump: '' });
   const byAddr = L.simulate({ ...BASE, program: 'li r4, 3\naddi r4, r4, -1\nbne r4, zero, 0x0004\nnop', dump: '' });
@@ -65,6 +71,10 @@ test('los errores de entrada se describen', () => {
   assert.match(bad({ program: 'foo r1' }).errors[0], /instrucción desconocida/);
   assert.match(bad({ program: 'bne r1, zero, 0x0100' }).errors[0], /dirección de salto/);
   assert.match(bad({ dump: '0x10: 1FF' }).errors[0], /byte hexadecimal/);
+  const far = bad({ dump: '0x2000: 00 11 22 33', addrBits: 12 });
+  assert.equal(far.errors.length, 1);
+  assert.match(far.errors[0], /4 direcciones quedan fuera de la memoria/);
+  assert.equal(bad({ addrBits: 6, cacheBytes: 128, dump: '0x1000: 00 11 22' }).errors.length, 1);
   assert.match(bad({ cacheBytes: 100 }).errors[0], /potencia de 2/);
   assert.match(bad({ program: 'li r1, 0x0002\nlw r2, 0(r1)' }).errors[0], /alineada/);
   assert.match(bad({ program: 'li r1, 0xFFFF\nlw r2, 0(r1)' }).errors[0], /fuera de la memoria|alineada/);
