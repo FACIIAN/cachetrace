@@ -1,0 +1,28 @@
+{
+  "name": "cachetrace",
+  "version": "1.2.0",
+  "description": "Simulador de memoria caché (mapeo directo, SA2W, SA4W y totalmente asociativa) con exportación a Excel",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node --test",
+    "start": "node scripts/serve.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/instrument-sans": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "exceljs": "^4.4.0"
+  },
+  "private": true,
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FACIIAN/cachetrace.git"
+  },
+  "homepage": "https://faciian.github.io/cachetrace/",
+  "engines": {
+    "node": ">=20"
+  },
+  "author": "FACIIAN"
+}
