@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Calculadora de memoria caché: bloque y offset, tag y línea o conjunto, trazas de accesos en directa, 2 y 4 vías y completamente asociativa, y resolución de un conjunto con write-back.">
+<meta name="theme-color" content="#0B0D10">
+<title>CacheTrace · Calculadora de ejercicios de caché</title>
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<script>
+/*__THEME_JS__*/
+</script>
+<style>
+/*__FONTS__*/
+/*__BASE_CSS__*/
+.panel > .sec-head h2, .res > .sec-head h2 { font-size: 16px; }
+.res { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+textarea.short { min-height: 96px; }
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 720px) { .cols2 { grid-template-columns: 1fr; } }
+.stateform { border-collapse: collapse; font: 13px var(--mono); }
+.stateform th, .stateform td { border: 1px solid var(--line); padding: 4px 6px; text-align: center; }
+.stateform th { background: var(--field); font-family: var(--ui); font-weight: 600; }
+.stateform input, .stateform select { padding: 4px 6px; width: 78px; }
+.stateform select { width: 58px; }
+.stateform input.num { width: 58px; }
+.legend-row { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 13px var(--mono); }
+.legend-row b { font-family: var(--ui); }
+.pol-tabs { margin: 2px 0; }
+.stepper { display: grid; grid-template-columns: auto minmax(120px, 1fr) auto; gap: 12px; align-items: center; }
+.stepper input[type=range] { width: 100%; accent-color: var(--accent-text); }
+.compete li { margin: 4px 0; }
+.compete code, .code { font-family: var(--mono); font-size: 13px; }
+@media (max-width: 560px) { .stepper { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-page="calculadora">
+<!--__CHROME__-->
+<div class="shell">
+  <header class="top">
+    <h1>Calculadora de caché</h1>
+    <p>Introduce los datos del ejercicio y obtén las tablas: bloque y offset, línea o conjunto y tag, trazas de accesos en las cuatro organizaciones, y la resolución de un conjunto con write-back.</p>
+  </header>
+
+  <aside class="side">
+    <section class="panel stack" aria-labelledby="h-cfg">
+      <h2 id="h-cfg">Memoria y caché</h2>
+      <div class="row2">
+        <div class="field"><label for="bits">Bus de direcciones (bits)</label><input id="bits" type="number" min="6" max="32" value="16"></div>
+        <div class="field"><label for="mem">Memoria principal</label><div class="size"><input id="mem" type="text" inputmode="decimal" value="64" spellcheck="false"><select id="mem_u" aria-label="Unidad de la memoria principal"></select></div></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="cacheB">Tamaño de la caché</label><div class="size"><input id="cacheB" type="text" inputmode="decimal" value="128" spellcheck="false"><select id="cacheB_u" aria-label="Unidad del tamaño de la caché"></select></div></div>
+        <div class="field"><label for="lineB">Tamaño de línea (bloque)</label><div class="size"><input id="lineB" type="text" inputmode="decimal" value="8" spellcheck="false"><select id="lineB_u" aria-label="Unidad del tamaño de línea"></select></div></div>
+      </div>
+      <p class="note" id="lineinfo"></p>
+      <div class="btns"><button class="btn" id="example" type="button">Cargar ejemplo</button></div>
+    </section>
+    <details class="panel">
+      <summary>Convenciones del modelo</summary>
+      <div class="body"><p>Caché unificada, inicialmente vacía salvo que indiques un estado inicial. Escritura write-back con write-allocate. Reemplazo LRU; en un miss se ocupa primero la vía inválida de menor número. Un SW deja la línea sucia (D=1); un LW no cambia D. Solo hay write-back si la víctima es válida y está sucia.</p></div>
+    </details>
+  </aside>
+
+  <main class="main">
+    <div class="tabs" role="tablist" aria-label="Tipo de cálculo">
+      <button type="button" role="tab" id="tb1" aria-controls="tab1" aria-selected="true">Dirección y ubicación</button>
+      <button type="button" role="tab" id="tb2" aria-controls="tab2" aria-selected="false">Trazas de accesos</button>
+      <button type="button" role="tab" id="tb3" aria-controls="tab3" aria-selected="false">Conjunto y write-back</button>
+    </div>
+    <div id="msgs"></div>
+
+    <!-- tab 1 -->
+    <div id="tab1" role="tabpanel" aria-labelledby="tb1" class="main">
+      <section class="panel stack">
+        <div class="cols2">
+          <div class="field"><label for="inAddrs">Direcciones (tabla A)</label><textarea id="inAddrs" class="short" spellcheck="false" placeholder="0x2A40&#10;0x2A47"></textarea></div>
+          <div class="field"><label for="inBlocks">Bloques (tabla B)</label><textarea id="inBlocks" class="short" spellcheck="false" placeholder="0x54A&#10;0x55A"></textarea></div>
+        </div>
+        <p class="note">Una por línea, o separadas por comas, en hexadecimal. Si dejas los bloques vacíos se usan los de la tabla A. El primer bloque de la tabla B es el de referencia para ver con quién compite.</p>
+        <div class="btns"><button class="btn primary" id="run1" type="button">Calcular</button></div>
+      </section>
+      <div id="out1" class="main"></div>
+    </div>
+
+    <!-- tab 2 -->
+    <div id="tab2" role="tabpanel" aria-labelledby="tb2" class="main" hidden>
+      <section class="panel stack">
+        <div class="field"><label for="inAcc">Accesos</label><textarea id="inAcc" spellcheck="false" placeholder="LW 0x1020&#10;SW 0x10A2"></textarea></div>
+        <p class="note">Un acceso por línea: LW o SW y la dirección en hexadecimal. Los bloques reciben una letra (A, B, C…) por orden de aparición.</p>
+        <div class="btns"><button class="btn primary" id="run2" type="button">Calcular</button></div>
+      </section>
+      <div id="out2" class="main"></div>
+    </div>
+
+    <!-- tab 3 -->
+    <div id="tab3" role="tabpanel" aria-labelledby="tb3" class="main" hidden>
+      <section class="panel stack">
+        <div class="row2" style="max-width:420px">
+          <div class="field"><label for="sWays">Vías</label><select id="sWays"><option value="2">2 vías</option><option value="4">4 vías</option><option value="8">8 vías</option></select></div>
+          <div class="field"><label for="sSet">Conjunto</label><input id="sSet" type="number" min="0" value="3"></div>
+        </div>
+        <div class="field"><span class="lbl">Estado inicial del conjunto</span><div class="scroll-x"><table class="stateform" id="stateForm"></table></div></div>
+        <p class="note">Orden: 1 = la menos reciente (LRU); el número más alto es la más reciente (MRU). Las vías con V=0 se ignoran.</p>
+        <div class="field"><label for="inSet">Accesos</label><textarea id="inSet" class="short" spellcheck="false" placeholder="SW 0x049C"></textarea></div>
+        <div class="btns"><button class="btn primary" id="run3" type="button">Calcular</button></div>
+      </section>
+      <div id="out3" class="main"></div>
+    </div>
+  </main>
+</div>
+<footer class="foot">CacheTrace v{{VERSION}} · Licencia MIT · <a href="{{REPO_URL}}" target="_blank" rel="noopener">Código en GitHub</a> · Los datos se procesan en tu navegador y no se envían a ningún servidor.</footer>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*__LIBS__*/
+</script>
+<script>
+(function () {
+  'use strict';
+  const T = BlockModel;
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const { sizeOf, setSize } = Sizes;
+  const SIZE_IDS = ['mem', 'cacheB', 'lineB'];
+  Sizes.init(SIZE_IDS);
+  $('#mem_u').value = 'KB';
+  const STORE = 'ct-calc-v1';
+  const FIELDS = ['bits', 'mem', 'mem_u', 'cacheB', 'cacheB_u', 'lineB', 'lineB_u', 'inAddrs', 'inBlocks', 'inAcc', 'sWays', 'sSet', 'inSet'];
+
+  const EXAMPLE = {
+    bits: '16', mem: '64', mem_u: 'KB', cacheB: '128', cacheB_u: 'B', lineB: '8', lineB_u: 'B',
+    inAddrs: '0x2A40\n0x2A47\n0x2A48\n0x31F0\n0x7FFF',
+    inBlocks: '0x40A\n0x41A\n0x42A\n0x412\n0x40B\n0x7FF',
+    inAcc: 'LW 0x2050\nLW 0x2054\nSW 0x20D2\nLW 0x2057\nSW 0x2152\nLW 0x20D5\nLW 0x2058\nLW 0x2051',
+    sWays: '2', sSet: '3', inSet: 'SW 0x049C\nLW 0x0419\nLW 0x04D9',
+  };
+  const SET_EXAMPLE = { ways: 2, rows: [{ v: 1, d: 1, tag: '0x10', ord: 1 }, { v: 1, d: 0, tag: '0x11', ord: 2 }] };
+
+  /* ------------------------------------------------------------ helpers */
+  function readCfg() {
+    return { addrBits: parseInt($('#bits').value, 10), cacheBytes: sizeOf('cacheB'), blockBytes: sizeOf('lineB') };
+  }
+  function showMsg(errors, warns) {
+    let h = '';
+    if (errors && errors.length) h += '<div class="msg err"><ul>' + errors.map((e) => '<li>' + esc(e) + '</li>').join('') + '</ul></div>';
+    if (warns && warns.length) h += '<div class="msg warn"><ul>' + warns.map((e) => '<li>' + esc(e) + '</li>').join('') + '</ul></div>';
+    $('#msgs').innerHTML = h;
+  }
+  let toastTimer;
+  function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 2800); }
+
+  function section(title, hintKey, cfg) {
+    const root = document.createElement('section');
+    root.className = 'res';
+    const head = document.createElement('div');
+    head.className = 'sec-head';
+    const h = document.createElement('h2'); h.textContent = title;
+    head.appendChild(h);
+    root.appendChild(head);
+    if (hintKey) {
+      const hint = HintUI.create(Hints.get(hintKey, cfg));
+      head.appendChild(hint.button);
+      root.appendChild(hint.panel);
+    }
+    const body = document.createElement('div');
+    body.className = 'stack';
+    root.appendChild(body);
+    return { root, body };
+  }
+  const tableHtml = (head, rows, o) => {
+    o = o || {};
+    return `<div class="scroll-x"><table class="grid">${o.caption ? `<caption>${esc(o.caption)}</caption>` : ''}<thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => (typeof c === 'object' && c !== null ? `<td class="${c.cls || ''}">${c.html !== undefined ? c.html : esc(c.text)}</td>` : `<td>${esc(c)}</td>`)).join('')}</tr>`).join('')}</tbody></table></div>`;
+  };
+  const hexList = (text) => {
+    const out = []; const bad = [];
+    String(text).split(/[\s,;]+/).filter(Boolean).forEach((tok) => { const v = Checker.parseHex(tok); if (v === undefined) bad.push(tok); else out.push(v); });
+    return { values: out, bad };
+  };
+  function parseAccesses(text, memBytes) {
+    const out = [], errors = [];
+    String(text).split(/\r?\n/).forEach((raw, i) => {
+      const line = raw.replace(/(#|\/\/).*$/, '').trim();
+      if (!line) return;
+      const m = line.match(/\b(lw|sw|load|store|lectura|escritura|ld|st|r|w|l|s)\b[\s:,]*((?:0x)?[0-9a-f]+)/i);
+      if (!m) { errors.push(`Acceso ${out.length + 1} (línea ${i + 1}): escribe LW o SW y una dirección en hexadecimal, por ejemplo "LW 0x1020".`); return; }
+      const op = /^(sw|store|escritura|st|w|s)$/i.test(m[1]) ? 'SW' : 'LW';
+      const addr = Checker.parseHex(m[2]);
+      if (addr === undefined || addr >= memBytes) { errors.push(`Línea ${i + 1}: la dirección ${m[2]} queda fuera de la memoria (llega hasta ${T.H(memBytes - 1)}).`); return; }
+      out.push({ op, addr });
+    });
+    return { accesses: out, errors };
+  }
+
+  function validated() {
+    const cfg = readCfg();
+    const errs = T.validate(cfg);
+    return { cfg, errs };
+  }
+
+  function lineInfo() {
+    const cfg = readCfg(), lines = cfg.cacheBytes / cfg.blockBytes;
+    $('#lineinfo').textContent = isFinite(lines) && lines >= 1 ? `La caché tiene ${lines} líneas de ${cfg.blockBytes} bytes.` : '';
+  }
+
+  /* ------------------------------------------------------------ tab 1: address and placement */
+  function run1() {
+    const { cfg, errs } = validated();
+    $('#out1').innerHTML = '';
+    if (errs.length) { showMsg(errs); return; }
+    const A = hexList($('#inAddrs').value), Bk = hexList($('#inBlocks').value);
+    const memBytes = Math.pow(2, cfg.addrBits);
+    const warns = [];
+    if (A.bad.length) warns.push('No se han entendido estas direcciones y se omiten: ' + A.bad.join(', '));
+    if (Bk.bad.length) warns.push('No se han entendido estos bloques y se omiten: ' + Bk.bad.join(', '));
+    const addrs = A.values.filter((a) => a < memBytes);
+    if (addrs.length < A.values.length) warns.push('Hay direcciones fuera de la memoria (llega hasta ' + T.H(memBytes - 1) + ') que se omiten.');
+    const maxBlock = memBytes / cfg.blockBytes;
+    let blocks = Bk.values.filter((b) => b < maxBlock);
+    if (blocks.length < Bk.values.length) warns.push('Hay bloques que no existen (el último es ' + T.H(maxBlock - 1) + ') y se omiten.');
+    if (!Bk.values.length) blocks = Array.from(new Set(T.tablaA(addrs, cfg).map((r) => r.block)));
+    showMsg([], warns);
+    const g1 = T.geometry(cfg, 1), g2 = T.geometry(cfg, 2), g4 = T.geometry(cfg, 4), gF = T.geometry(cfg, 'full');
+    const hexW = g1.hexW;
+
+    // diagnostics
+    const d = T.diagnostics(cfg, addrs[0] !== undefined ? addrs[0] : 0);
+    const s1 = section('Diagnóstico de la configuración', 'diag', cfg);
+    s1.body.innerHTML = `<div class="kv"><div><small>Posiciones</small><b>${d.positions}</b></div><div><small>Rango</small><b>${T.H(0, hexW)}–${T.H(d.rangeEnd, hexW)}</b></div><div><small>Bus de direcciones</small><b>${T.bits(d.busBits)}</b></div><div><small>Líneas</small><b>${d.lines}</b></div><div><small>Offset</small><b>${T.bits(d.offBits)}</b></div></div>`
+      + tableHtml(['Organización', 'Tag', 'Línea / conjunto', 'Offset', 'Conjuntos'], [
+        ['Direct Mapping', { text: g1.tagBits + ' bits', cls: 'c-tag' }, { text: g1.idxBits + ' bits', cls: 'c-idx' }, { text: g1.offBits + ' bits', cls: 'c-off' }, g1.sets],
+        ['2 vías', { text: g2.tagBits + ' bits', cls: 'c-tag' }, { text: g2.idxBits + ' bits', cls: 'c-idx' }, { text: g2.offBits + ' bits', cls: 'c-off' }, g2.sets],
+        ['4 vías', { text: g4.tagBits + ' bits', cls: 'c-tag' }, { text: g4.idxBits + ' bits', cls: 'c-idx' }, { text: g4.offBits + ' bits', cls: 'c-off' }, g4.sets],
+        ['Full Associative', { text: gF.tagBits + ' bits', cls: 'c-tag' }, { text: '—', cls: 'c-idx' }, { text: gF.offBits + ' bits', cls: 'c-off' }, 1],
+      ].map((r) => r));
+    $('#out1').appendChild(s1.root);
+
+    // table A
+    if (addrs.length) {
+      const sa = section('Tabla A · Bloque y desplazamiento', 'ubic', cfg);
+      sa.body.innerHTML = tableHtml(['Dirección', 'Bloque MP', 'Rango del bloque', 'Offset'], T.tablaA(addrs, cfg).map((r) => [T.H(r.addr, hexW), T.H(r.block), `${T.H(r.start, hexW)}–${T.H(r.end, hexW)}`, r.offset]));
+      $('#out1').appendChild(sa.root);
+    }
+
+    // table B
+    if (blocks.length) {
+      const sb = section('Tabla B · Lugar y tag', 'ubic', cfg);
+      const rowsB = T.tablaB(blocks, cfg);
+      sb.body.innerHTML = tableHtml(['Bloque', 'Binario (grupos de 4)', 'Línea DM', 'Tag DM', 'Set 2v', 'Tag 2v', 'Set 4v', 'Tag 4v'], rowsB.map((r) => [T.H(r.block), T.groups4(r.block, gF.blockBits), r.dm.set, T.H(r.dm.tag), r.sa2.set, T.H(r.sa2.tag), r.sa4.set, T.H(r.sa4.tag)]))
+        + `<p class="sub">Directa: línea = ${T.lastBits(g1.idxBits)} del bloque. 2 vías: set = ${T.lastBits(g2.idxBits)}. 4 vías: set = ${T.lastBits(g4.idxBits)}. El tag es el resto de bits de la izquierda.</p>`;
+      $('#out1').appendChild(sb.root);
+
+      const ref = blocks[0];
+      const sc = section(`Quién compite con el bloque ${T.H(ref)}`, null, cfg);
+      const grp = (sets, name) => `<li><b>${name}</b>: ${T.competing(blocks, ref, sets).sort((a, b) => a - b).map((b) => `<code>${T.H(b)}</code>`).join(', ')}</li>`;
+      sc.body.innerHTML = `<ul class="compete">${grp(g1.sets, 'Direct Mapping (línea ' + (ref % g1.sets) + ')')}${grp(g2.sets, '2 vías (set ' + (ref % g2.sets) + ')')}${grp(g4.sets, '4 vías (set ' + (ref % g4.sets) + ')')}</ul><p class="sub">Los bloques compiten cuando caen en la misma línea o conjunto (mismo resto al dividir entre ${g1.sets}, ${g2.sets} o ${g4.sets}). En completamente asociativa no hay competencia por el lugar.</p>`;
+      $('#out1').appendChild(sc.root);
+    }
+  }
+
+  /* ------------------------------------------------------------ tab 2: traces */
+  let last2 = null;
+  const placeCls = (p) => p;
+
+  function traceTable(tr, cfg) {
+    const hexW = tr.geo.hexW;
+    const rows = tr.rows.map((r) => [r.n, r.op, T.H(r.addr, hexW), r.letter, T.H(r.block), r.offset, T.H(r.tag), { text: r.hit ? 'H' : 'M', cls: r.hit ? 'hit' : 'miss' }, placeCls(r.place), T.victimLabel(r.victim), r.wb ? 'Sí' : 'No', r.wb ? `${T.H(r.victim.start, hexW)}–${T.H(r.victim.end, hexW)}` : '—']);
+    return tableHtml(['N.º', 'Op.', 'Dirección', 'Bloque', 'N.º bloque', 'Offset', 'Tag', 'H/M', 'Lugar', 'Víctima', 'WB', 'Rango del write-back'], rows);
+  }
+  function stateTable(final, pol, ways) {
+    if (!final.length) return '<p class="sub">La caché sigue vacía.</p>';
+    const lab = (w) => (w.v ? `${w.letter || T.H(w.block)} ${w.d ? 'sucia' : 'limpia'}` : '—');
+    if (pol.kind === 'DM') return tableHtml(['Línea', 'Contenido'], final.map((s) => [`L${s.set}`, lab(s.ways[0])]));
+    if (pol.kind === 'FA') {
+      const st = final[0], used = st.ways.filter((w) => w.v);
+      return tableHtml([...used.map((w) => 'V' + w.way), 'Orden LRU → MRU'], [[...used.map(lab), st.order.map((i) => st.ways[i].letter || T.H(st.ways[i].block)).join(', ')]]);
+    }
+    return tableHtml(['Conjunto', ...Array.from({ length: ways }, (_, i) => 'V' + i), 'Orden LRU → MRU'], final.map((s) => [`S${s.set}`, ...s.ways.map(lab), s.order.map((i) => s.ways[i].letter || T.H(s.ways[i].block)).join(', ')]));
+  }
+
+  function run2() {
+    const { cfg, errs } = validated();
+    const out = $('#out2'); out.innerHTML = '';
+    if (errs.length) { showMsg(errs); return; }
+    const P = parseAccesses($('#inAcc').value, Math.pow(2, cfg.addrBits));
+    if (!P.accesses.length && !P.errors.length) P.errors.push('Escribe al menos un acceso, por ejemplo "LW 0x1020".');
+    if (P.errors.length) { showMsg(P.errors); return; }
+    const letters = T.assignLetters(P.accesses.map((a) => T.decompose(a.addr, cfg).block));
+    if (letters.size > 26) { showMsg(['Hay más de 26 bloques distintos; reduce los accesos.']); return; }
+    showMsg([]);
+    const traces = {};
+    T.POLICIES.forEach((p) => { traces[p.key] = T.trace(P.accesses, cfg, p, null, letters); });
+    last2 = { cfg, accesses: P.accesses, letters, traces };
+
+    // legend
+    const sl = section('Bloques del ejercicio', null, cfg);
+    sl.body.innerHTML = `<div class="legend-row">${Array.from(letters.entries()).map(([b, l]) => `<span><b>${l}</b> = ${T.H(b)}</span>`).join('')}</div>`;
+    out.appendChild(sl.root);
+
+    // one section per policy, with tabs
+    const sp = document.createElement('section'); sp.className = 'res';
+    sp.innerHTML = '<div class="tabs pol-tabs" role="tablist" aria-label="Organización de la caché"></div><div class="pol-body stack"></div>';
+    const tabsEl = sp.querySelector('.tabs'), bodyEl = sp.querySelector('.pol-body');
+    function showPol(key) {
+      Array.from(tabsEl.children).forEach((b) => b.setAttribute('aria-selected', String(b.dataset.k === key)));
+      const tr = traces[key], pol = tr.policy, t = tr.totals;
+      bodyEl.innerHTML = '';
+      const head = document.createElement('div'); head.className = 'sec-head';
+      const g = tr.geo;
+      head.innerHTML = `<h2>${esc(pol.name)}</h2>`;
+      const hint = HintUI.create(Hints.get('trace-' + key, cfg));
+      head.appendChild(hint.button);
+      bodyEl.appendChild(head); bodyEl.appendChild(hint.panel);
+      const info = document.createElement('p'); info.className = 'sub';
+      info.textContent = pol.kind === 'DM' ? `tag ${T.bits(g.tagBits)} | línea ${T.bits(g.idxBits)} | offset ${T.bits(g.offBits)}` : pol.kind === 'FA' ? `tag ${T.bits(g.tagBits)} | offset ${T.bits(g.offBits)}` : `tag ${T.bits(g.tagBits)} | conjunto ${T.bits(g.idxBits)} | offset ${T.bits(g.offBits)}`;
+      bodyEl.appendChild(info);
+      const tbl = document.createElement('div'); tbl.innerHTML = traceTable(tr, cfg); bodyEl.appendChild(tbl);
+      const tot = document.createElement('div');
+      tot.innerHTML = `<div class="kv"><div><small>Hits</small><b>${t.hits}</b></div><div><small>Misses</small><b>${t.misses}</b></div><div><small>Expulsiones</small><b>${t.evictions}</b></div><div><small>Write-backs</small><b>${t.writebacks}</b></div><div><small>Misses obligatorios</small><b>${t.compulsory}</b></div></div>`;
+      bodyEl.appendChild(tot);
+      const st = document.createElement('div');
+      st.innerHTML = '<p class="lbl" style="margin:4px 0 6px">Estado final de la zona utilizada</p>' + stateTable(tr.final, pol, tr.geo.ways);
+      bodyEl.appendChild(st);
+    }
+    T.POLICIES.forEach((p) => {
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.k = p.key; b.textContent = p.tab; b.setAttribute('role', 'tab');
+      b.addEventListener('click', () => showPol(p.key)); tabsEl.appendChild(b);
+    });
+    out.appendChild(sp);
+    showPol('DM');
+
+    // comparison
+    const sc = section('Comparación entre políticas', 'comp', cfg);
+    const rowsC = T.POLICIES.map((p) => { const t = traces[p.key].totals; return [{ text: p.short, cls: 'l' }, t.hits, t.misses, t.evictions, t.writebacks]; });
+    const oblig = traces.FA.totals.compulsory, dm = traces.DM.totals.misses, fa = traces.FA.totals.misses;
+    const pairs = [['DM', 'SA2'], ['SA2', 'SA4'], ['SA4', 'FA']].map(([a, b]) => ({ a, b, fc: T.firstChange(traces[a], traces[b]) }));
+    sc.body.innerHTML = tableHtml(['Política', 'Hits', 'Misses', 'Expulsiones', 'Write-backs'], rowsC)
+      + `<ul class="compete"><li><b>Misses obligatorios</b> (primer acceso a cada bloque): ${oblig}. Permanecen incluso con asociatividad completa.</li><li><b>Misses que desaparecen</b> de Directa a Completamente asociativa: ${dm - fa}${dm - fa ? ' (conflictos: el lugar permitido estaba lleno aunque quedaran líneas libres en otros sitios)' : ''}.</li>${fa > oblig ? `<li><b>Misses de capacidad</b> en completamente asociativa: ${fa - oblig} (la caché solo tiene ${traces.FA.geo.lines} líneas).</li>` : ''}</ul>`
+      + '<p class="lbl" style="margin:4px 0">Primer acceso cuyo resultado hit/miss cambia al aumentar la asociatividad</p><ul class="compete">'
+      + pairs.map((p) => `<li><b>${esc(T.policy(p.a).short)} → ${esc(T.policy(p.b).short)}</b>: ${p.fc ? `acceso ${p.fc.n}. ${esc(p.fc.text)}` : 'no cambia ningún resultado.'}</li>`).join('') + '</ul>';
+    out.appendChild(sc.root);
+
+    // state after access n
+    const ss = section('Estado de la caché tras un acceso', null, cfg);
+    ss.body.innerHTML = `<div class="stepper"><label for="stepN" class="lbl">Después del acceso</label><input type="range" id="stepN" min="1" max="${P.accesses.length}" value="${Math.min(P.accesses.length, 6)}" aria-label="Número de acceso"><b id="stepLbl" class="code"></b></div><div id="stepOut" class="stack"></div>`;
+    out.appendChild(ss.root);
+    function showStep() {
+      const n = parseInt($('#stepN').value, 10);
+      $('#stepLbl').textContent = `${n} de ${P.accesses.length}`;
+      $('#stepOut').innerHTML = T.POLICIES.map((p) => {
+        const tr = T.trace(P.accesses.slice(0, n), cfg, p, null, letters);
+        return `<div><p class="lbl" style="margin:4px 0 6px">${esc(p.name)}</p>${stateTable(tr.final, p, tr.geo.ways)}</div>`;
+      }).join('');
+    }
+    $('#stepN').addEventListener('input', showStep); showStep();
+  }
+
+  /* ------------------------------------------------------------ tab 3: one set */
+  function buildStateForm(ways, rows) {
+    const t = $('#stateForm');
+    let h = '<thead><tr><th>Vía</th><th>V</th><th>D</th><th>Tag</th><th>Orden</th></tr></thead><tbody>';
+    for (let i = 0; i < ways; i++) {
+      const r = rows && rows[i] ? rows[i] : { v: 0, d: 0, tag: '', ord: '' };
+      h += `<tr><td>V${i}</td><td><select data-f="v" data-i="${i}" aria-label="V de la vía ${i}"><option value="0"${r.v ? '' : ' selected'}>0</option><option value="1"${r.v ? ' selected' : ''}>1</option></select></td>`
+        + `<td><select data-f="d" data-i="${i}" aria-label="D de la vía ${i}"><option value="0"${r.d ? '' : ' selected'}>0</option><option value="1"${r.d ? ' selected' : ''}>1</option></select></td>`
+        + `<td><input type="text" data-f="tag" data-i="${i}" value="${esc(r.tag)}" placeholder="0x…" spellcheck="false" aria-label="Tag de la vía ${i}"></td>`
+        + `<td><input type="text" class="num" data-f="ord" data-i="${i}" value="${esc(r.ord)}" inputmode="numeric" aria-label="Orden de la vía ${i}"></td></tr>`;
+    }
+    t.innerHTML = h + '</tbody>';
+  }
+  function readStateForm(ways) {
+    const get = (f, i) => $(`#stateForm [data-f="${f}"][data-i="${i}"]`).value;
+    const list = [], errs = [];
+    for (let i = 0; i < ways; i++) {
+      const v = Number(get('v', i)), d = Number(get('d', i));
+      let tag = 0;
+      if (v) { const p = Checker.parseHex(get('tag', i)); if (p === undefined) errs.push(`El tag de la vía V${i} no es un número hexadecimal.`); else tag = p; }
+      const ord = parseInt(get('ord', i), 10);
+      list.push({ v, d: v ? d : 0, tag, ord: isNaN(ord) ? null : ord, way: i });
+    }
+    const valid = list.filter((w) => w.v).sort((a, b) => (a.ord === null ? 1e9 + a.way : a.ord) - (b.ord === null ? 1e9 + b.way : b.ord));
+    return { ways: list.map(({ v, d, tag }) => ({ v, d, tag })), order: valid.map((w) => w.way), errs };
+  }
+
+  function run3() {
+    const { cfg, errs } = validated();
+    const out = $('#out3'); out.innerHTML = '';
+    if (errs.length) { showMsg(errs); return; }
+    const ways = parseInt($('#sWays').value, 10), set = parseInt($('#sSet').value, 10);
+    const g = T.geometry(cfg, ways);
+    if (ways > g.lines) { showMsg([`Con ${g.lines} líneas no se puede hacer una caché de ${ways} vías.`]); return; }
+    if (!(set >= 0 && set < g.sets)) { showMsg([`Con ${ways} vías hay ${g.sets} conjuntos: el conjunto debe estar entre 0 y ${g.sets - 1}.`]); return; }
+    const st = readStateForm(ways);
+    const P = parseAccesses($('#inSet').value, Math.pow(2, cfg.addrBits));
+    if (!P.accesses.length && !P.errors.length) P.errors.push('Escribe al menos un acceso, por ejemplo "SW 0x049C".');
+    const all = st.errs.concat(P.errors);
+    if (all.length) { showMsg(all); return; }
+    const tr = T.trace(P.accesses, cfg, T.saPolicy(ways), [{ set, ways: st.ways, order: st.order }]);
+    const other = tr.rows.filter((r) => r.set !== set);
+    showMsg([], other.length ? [`${other.length === 1 ? 'Un acceso va' : other.length + ' accesos van'} a otros conjuntos (${Array.from(new Set(other.map((r) => 'S' + r.set))).join(', ')}), que empiezan vacíos.`] : []);
+    const hexW = g.hexW;
+    const stateLine = (s) => `${esc('S' + s.set)}`;
+    const sr = section(`Resolución en ${ways} vías`, 'wb', cfg);
+    const vtxt = (v) => (v ? `tag ${T.H(v.tag)} ${v.dirty ? 'sucia' : 'limpia'}` : '—');
+    sr.body.innerHTML = tableHtml(['N.º', 'Acceso', 'Bloque', 'Offset', 'Set', 'Tag', 'H/M', 'Vía', 'Víctima', 'WB', 'Rango del write-back'],
+      tr.rows.map((r) => [r.n, `${r.op} ${T.H(r.addr, hexW)}`, T.H(r.block), r.offset, r.set, T.H(r.tag), { text: r.hit ? 'H' : 'M', cls: r.hit ? 'hit' : 'miss' }, 'V' + r.way, vtxt(r.victim), r.wb ? 'Sí' : 'No', r.wb ? `${T.H(r.victim.start, hexW)}–${T.H(r.victim.end, hexW)}` : '—']))
+      + `<ul class="compete">${tr.rows.map((r) => `<li><b>${r.n}.</b> ${r.op} ${T.H(r.addr, hexW)}: bloque ${T.H(r.block)} (dirección ÷ ${cfg.blockBytes}), set ${r.set} (bloque mod ${g.sets}), tag ${T.H(r.tag)} (bloque div ${g.sets}). ${r.hit ? `Hit en V${r.way}.` : `Miss.${r.victim ? ` Vías ocupadas: víctima LRU V${r.victim.way}, ${vtxt(r.victim)}.` : ` Se ocupa la vía inválida V${r.way}.`}`}${r.wb ? ` Write-back del bloque ${T.H(r.victim.block)}.` : ''}</li>`).join('')}</ul>`;
+    out.appendChild(sr.root);
+    const sf = section('Estado final', null, cfg);
+    sf.body.innerHTML = tr.final.map((s) => tableHtml(['Vía', 'V', 'D', 'Tag', 'Orden (1 = LRU)'], s.ways.map((w) => [`V${w.way}`, w.v, w.d, w.v ? T.H(w.tag) : '—', w.v ? s.order.indexOf(w.way) + 1 : '—']), { caption: `Conjunto S${s.set}` })).join('');
+    out.appendChild(sf.root);
+  }
+
+  /* ------------------------------------------------------------ wiring */
+  const tabs = [['tb1', 'tab1'], ['tb2', 'tab2'], ['tb3', 'tab3']];
+  tabs.forEach(([b, p]) => $('#' + b).addEventListener('click', () => {
+    tabs.forEach(([bb, pp]) => { $('#' + bb).setAttribute('aria-selected', String(bb === b)); $('#' + pp).hidden = pp !== p; });
+    showMsg([]);
+  }));
+  function save() { try { const o = {}; FIELDS.forEach((f) => { o[f] = $('#' + f).value; }); o.stateRows = readStateRaw(); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) { /* storage unavailable */ } }
+  function readStateRaw() { const ways = parseInt($('#sWays').value, 10), rows = []; for (let i = 0; i < ways; i++) { const g = (f) => $(`#stateForm [data-f="${f}"][data-i="${i}"]`).value; rows.push({ v: Number(g('v')), d: Number(g('d')), tag: g('tag'), ord: g('ord') }); } return rows; }
+  function load() { try { const raw = localStorage.getItem(STORE); if (!raw) return false; const o = JSON.parse(raw); FIELDS.forEach((f) => { if (typeof o[f] === 'string') $('#' + f).value = o[f]; }); buildStateForm(parseInt($('#sWays').value, 10), o.stateRows); return true; } catch (e) { return false; } }
+  function fill(o) { Object.keys(o).forEach((k) => { $('#' + k).value = o[k]; }); }
+
+  $('#bits').addEventListener('input', () => { const b = parseInt($('#bits').value, 10); if (b >= 1 && b <= 32) setSize('mem', Math.pow(2, b)); lineInfo(); });
+  const onMem = () => { const v = sizeOf('mem'); if (v > 1 && Math.log2(v) % 1 === 0 && v <= 4294967296) $('#bits').value = Math.log2(v); lineInfo(); };
+  ['mem', 'mem_u'].forEach((id) => ['input', 'change'].forEach((ev) => $('#' + id).addEventListener(ev, onMem)));
+  ['cacheB', 'cacheB_u', 'lineB', 'lineB_u'].forEach((id) => ['input', 'change'].forEach((ev) => $('#' + id).addEventListener(ev, lineInfo)));
+  $('#sWays').addEventListener('change', () => buildStateForm(parseInt($('#sWays').value, 10), null));
+  $('#run1').addEventListener('click', () => { save(); run1(); });
+  $('#run2').addEventListener('click', () => { save(); run2(); });
+  $('#run3').addEventListener('click', () => { save(); run3(); });
+  $('#example').addEventListener('click', () => { fill(EXAMPLE); buildStateForm(SET_EXAMPLE.ways, SET_EXAMPLE.rows); lineInfo(); run1(); run2(); run3(); showMsg([]); toast('Ejemplo cargado'); });
+  document.addEventListener('keydown', (e) => {
+    if (!((e.ctrlKey || e.metaKey) && e.key === 'Enter')) return;
+    const open = ['tab1', 'tab2', 'tab3'].find((id) => !$('#' + id).hidden);
+    ({ tab1: run1, tab2: run2, tab3: run3 })[open]();
+  });
+
+  if (!load()) { fill(EXAMPLE); buildStateForm(SET_EXAMPLE.ways, SET_EXAMPLE.rows); }
+  lineInfo();
+  run1(); run2(); run3(); showMsg([]);
+})();
+</script>
+</body>
+</html>
