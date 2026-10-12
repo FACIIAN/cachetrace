@@ -7,77 +7,14 @@
 <title>CacheTrace · Simulador de memoria caché</title>
 <!--__HEAD_EXTRA__-->
 <script>
+/*__THEME_JS__*/
+</script>
+<script>
 /*__EXCELJS__*/
 </script>
 <style>
 /*__FONTS__*/
-:root {
-  box-sizing: border-box;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  --bg: #EDF0F4; --surface: #FFFFFF; --field: #F6F8FA; --ink: #17202B; --muted: #566273; --line: #D2D9E2;
-  --tag: #EA9999; --idx: #C9DAF8; --off: #B6D7A8; --cell-ink: #17202B;
-  --hit: #1B6A38; --miss: #A32626; --accent: #17202B; --accent-ink: #FFFFFF; --chg: #FFF0B8; --sel: #E4ECFA;
-  --warn-bg: #FFF4D6; --warn-ink: #6B4E00; --err-bg: #FCE3E3; --err-ink: #8A1F1F;
-  --ui: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #10151C; --surface: #19202A; --field: #141A22; --ink: #E7ECF2; --muted: #9AA6B5; --line: #2C3644;
-    --hit: #7FD19A; --miss: #F29A9A; --accent: #E7ECF2; --accent-ink: #10151C; --chg: #4B4010; --sel: #23324A;
-    --warn-bg: #3A3010; --warn-ink: #F1D48A; --err-bg: #3C1C1C; --err-ink: #F3B1B1;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #10151C; --surface: #19202A; --field: #141A22; --ink: #E7ECF2; --muted: #9AA6B5; --line: #2C3644;
-  --hit: #7FD19A; --miss: #F29A9A; --accent: #E7ECF2; --accent-ink: #10151C; --chg: #4B4010; --sel: #23324A;
-  --warn-bg: #3A3010; --warn-ink: #F1D48A; --err-bg: #3C1C1C; --err-ink: #F3B1B1;
-}
-html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
-*, *::before, *::after { box-sizing: inherit; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--ui); min-height: 100%; }
-h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.2; }
-h1 { font-size: 26px; letter-spacing: -0.01em; }
-h2 { font-size: 15px; }
-p { margin: 0; }
-button, input, select, textarea { font: inherit; color: inherit; }
-:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-
-.shell { max-width: 1480px; margin: 0 auto; padding: 20px 20px 48px; display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; align-items: start; }
-header.top { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
-header.top p { color: var(--muted); max-width: 70ch; }
-@media (max-width: 980px) { .shell { grid-template-columns: minmax(0, 1fr); padding: 14px 12px 40px; } }
-
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
-.side { display: flex; flex-direction: column; gap: 14px; }
-@media (min-width: 981px) { .side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; } }
-.field { display: flex; flex-direction: column; gap: 4px; }
-.field label, .lbl { font-size: 13px; font-weight: 500; }
-.field .hint { font-size: 12.5px; color: var(--muted); }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.size { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
-.size select { width: auto; padding-left: 6px; padding-right: 6px; }
-input[type=text], input[type=number], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--field); border-radius: 7px; padding: 7px 9px; }
-textarea { font-family: var(--mono); font-size: 13px; line-height: 1.45; resize: vertical; min-height: 120px; white-space: pre; overflow: auto; }
-input[type=text], input[type=number] { font-family: var(--mono); font-size: 14px; }
-.stack { display: flex; flex-direction: column; gap: 10px; }
-.btns { display: flex; flex-wrap: wrap; gap: 8px; }
-button.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 8px 14px; cursor: pointer; font-weight: 500; }
-button.btn:hover { background: var(--field); }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-button.primary:hover { background: var(--accent); opacity: 0.9; }
-button.btn:disabled { opacity: 0.45; cursor: not-allowed; }
-details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
-details .body { margin-top: 8px; font-size: 13px; color: var(--muted); }
-details code { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
-.note { font-size: 12.5px; color: var(--muted); }
-
-.main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.msg { border-radius: 8px; padding: 10px 14px; font-size: 14px; }
-.msg ul { margin: 0; padding-left: 18px; }
-.msg.err { background: var(--err-bg); color: var(--err-ink); }
-.msg.warn { background: var(--warn-bg); color: var(--warn-ink); }
+/*__BASE_CSS__*/
 
 /* bit ruler */
 .ruler { display: flex; flex-direction: column; gap: 6px; }
@@ -157,17 +94,13 @@ table.regs th { background: var(--field); font-weight: 600; }
 table.regs tr.chg td { background: var(--chg); }
 .sub { font-size: 13px; color: var(--muted); margin: 2px 0 8px; }
 .empty-state { text-align: center; color: var(--muted); padding: 40px 12px; }
-.foot { max-width: 1480px; margin: 0 auto; padding: 0 20px 28px; font-size: 12.5px; color: var(--muted); }
-.foot a { color: inherit; }
-#toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--accent); color: var(--accent-ink); padding: 9px 16px; border-radius: 8px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; z-index: 20; }
-#toast.on { opacity: 1; }
-@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
 </style>
 </head>
 <body>
+<!--__CHROME__-->
 <div class="shell">
   <header class="top">
-    <h1>CacheTrace</h1>
+    <h1>Simulador de caché</h1>
     <p>Simulador de memoria caché para ejercicios de arquitectura de computadores. Calcula, instrucción a instrucción, los accesos en mapeo directo, asociativa por conjuntos de 2 y 4 vías y totalmente asociativa, y exporta las tablas a Excel.</p>
   </header>
 
@@ -299,6 +232,9 @@ table.regs tr.chg td { background: var(--chg); }
 /*__ENGINE__*/
 </script>
 <script>
+/*__SIZES__*/
+</script>
+<script>
 (function () {
   'use strict';
   const L = CacheLab;
@@ -315,27 +251,9 @@ table.regs tr.chg td { background: var(--chg); }
   const FIELDS = ['bits', 'mem', 'mem_u', 'cacheB', 'cacheB_u', 'lineB', 'lineB_u', 'policy', 'base', 'progBase', 'maxSteps', 'prog', 'dump'];
 
   /* ---------- inputs ---------- */
-  function parseSize(s) {
-    const m = String(s).trim().match(/^(\d+(?:\.\d+)?)\s*([kmg]?)\s*(?:i?b(?:ytes?)?)?$/i);
-    if (!m) return NaN;
-    const mult = { '': 1, k: 1024, m: 1048576, g: 1073741824 }[m[2].toLowerCase()];
-    return Math.round(parseFloat(m[1]) * mult);
-  }
-  const UNITS = [['B', 'bytes', 1], ['KB', 'Kbytes', 1024], ['MB', 'Mbytes', 1048576], ['GB', 'Gbytes', 1073741824]];
-  const UNIT_MULT = Object.fromEntries(UNITS.map(([k, , m]) => [k, m]));
-  SIZE_IDS.forEach((id) => { $('#' + id + '_u').innerHTML = UNITS.map(([k, label]) => `<option value="${k}">${label}</option>`).join(''); });
+  const { sizeOf, setSize, parseSize } = Sizes;
+  Sizes.init(SIZE_IDS);
   $('#mem_u').value = 'KB';
-  // Reads a size field: the number is multiplied by the selected unit. A number that already carries a unit ("64 KB") is accepted too.
-  function sizeOf(id) {
-    const raw = $('#' + id).value.trim().replace(',', '.');
-    if (/[a-z]/i.test(raw)) return parseSize(raw);
-    return /^\d+(\.\d+)?$/.test(raw) ? Math.round(parseFloat(raw) * UNIT_MULT[$('#' + id + '_u').value]) : NaN;
-  }
-  // Writes a size in bytes using the largest unit that represents it exactly.
-  function setSize(id, bytes) {
-    const [unit, , mult] = UNITS.slice().reverse().find(([, , m]) => bytes >= m && bytes % m === 0) || UNITS[0];
-    $('#' + id).value = String(bytes / mult); $('#' + id + '_u').value = unit;
-  }
   function readCfg() {
     const pb = L.parseNum($('#progBase').value || '0', 16);
     return {

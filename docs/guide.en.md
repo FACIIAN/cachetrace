@@ -100,6 +100,49 @@ You can choose which organizations to export. The workbooks open in Excel and Li
 - Writes into the program area do not modify the instructions.
 - The application interface is currently in Spanish.
 
+
+## Calculator
+
+The **Calculator** page solves exercises where loose data are given (address, block, place, victim, block range, offset…) using the same conventions as the simulator. Memory and cache sizes are entered as a number and a unit (bytes, Kbytes, Mbytes, Gbytes), as in the simulator. It has three tabs:
+
+| Tab | Input | Result |
+| --- | --- | --- |
+| Address and placement | A list of addresses and a list of blocks, in hexadecimal | Configuration diagnostics (positions, range, lines, tag/line-or-set/offset bits per organization), table A (block, range and offset), table B (line or set and tag for direct, 2-way and 4-way, with the block in binary) and which blocks compete with the reference one |
+| Access traces | `LW`/`SW` accesses with their address | One letter per block (A, B, C… by order of appearance); a table per organization with H/M, place (`L4`, `S4/V0`, `V0`), victim (`A limpia`, `B sucia`, `—`) and write-back with its range; totals; final state of the used zone; comparison between policies; first access that changes between organizations and why; and the cache state after any access |
+| Set and write-back | Ways, set number, initial state (V, D, tag and LRU order) and accesses | Access-by-access resolution (block, offset, set, tag, H/M, way, victim, write-back and range written) and the final state with the updated LRU order |
+
+Every result has a lightbulb button that explains the method. The interface is in Spanish.
+
+## Practice
+
+The **Practice** page offers three exams (**Easy**, **Intermediate** and **Hard**). All of them have the same ten activities:
+
+1. Diagnostics: positions and range, bus bits, block and offset, lines, tag/line/offset bits, sets and three theory questions.
+2. From address to placement: table A, table B and competing blocks.
+3. Variants A to D: access trace on direct-mapped, 2-way, 4-way and fully associative, with final state, totals and the first access that changes against another organization.
+4. Comparison between policies.
+5. Find the error.
+6. Write and write-back on a set with an initial state.
+7. Final test: a sequence of accesses on one set and sentences to complete.
+
+| Level | What changes |
+| --- | --- |
+| Easy | Usual configuration (16-bit bus, 128 B cache, 8 B block), 8 accesses and many given cells |
+| Intermediate | Same configuration, 12 accesses, fewer given cells, 5 competing blocks and a set with a write *hit* |
+| Hard | 15-bit bus and 16 B blocks, 16 accesses, 9 blocks (fully associative also evicts), 4-way sets with an invalid way and almost nothing given |
+
+**Grading.** The *Check* button (per activity or for the whole exam) marks each cell green, red, or with “?” when unanswered. It never shows the solution. Answers are compared by value, not by spelling: `0x204`, `0X204`, `204` and `0x0204` are the same; so are `Sí`, `si` and `S`; `L4` and `l4`; `S4/V0` and `s4 - v0`; `A limpia` and `a (limpia)`; ranges accept `-`, `–` and `—`. Answers are stored in the browser.
+
+**Hints.** The lightbulb in each activity explains the method with the parameters of the exam, for example: write the block in binary in groups of 4 digits and split the line or set bits off from the right; the rest is the tag.
+
+**Solution.** At the end of every exam you can download a PDF with all the solved tables and an explanation of how each result is obtained. The PDFs are generated when the site is built (`npm run build`) from the same data and engine used for grading.
+
+The exercises are original. Their data live in `src/exams.js` and their solutions are computed with `src/blockmodel.js`, which is covered by tests and an independent reference model. The interface is in Spanish.
+
+## Light and dark theme
+
+The sun and moon button (top left) switches the whole website between dark (default) and light, with a smooth half-second transition. The choice is remembered in the browser. With “reduce motion” enabled in the system, the change is instant.
+
 ## Verification
 
 `npm test` runs:
@@ -107,6 +150,8 @@ You can choose which organizations to export. The workbooks open in Excel and Li
 - the sample exercise, with the expected results for the four caches;
 - parser and error-message tests;
 - a comparison against an independent reference model (`tests/reference.js`) on random programs;
-- Excel workbook generation.
+- Excel workbook generation;
+- the exercise model (`src/blockmodel.js`) against the same independent reference model;
+- the three practice exams: unique cells, increasing difficulty, variety of cases, solution accepted by the checker and PDF generation.
 
 The reference model checks that the engine follows the conventions above. It does not replace comparing against the official solution of a specific exercise: if your course uses other conventions, check the result against your problem statement.

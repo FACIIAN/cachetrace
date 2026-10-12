@@ -100,6 +100,49 @@ Puedes elegir qué organizaciones exportar. Los libros se abren con Excel y Libr
 - Las escrituras a la zona del programa no modifican las instrucciones.
 - La interfaz de la aplicación está en español.
 
+
+## Calculadora
+
+La página **Calculadora** resuelve los ejercicios en los que se dan datos sueltos (dirección, bloque, lugar, víctima, rango del bloque, offset…) con las mismas convenciones que el simulador. Los datos de memoria y caché se escriben con número y unidad (bytes, Kbytes, Mbytes, Gbytes), como en el simulador. Tiene tres pestañas:
+
+| Pestaña | Entrada | Resultado |
+| --- | --- | --- |
+| Dirección y ubicación | Lista de direcciones y lista de bloques, en hexadecimal | Diagnóstico de la configuración (posiciones, rango, líneas, bits de tag, línea o conjunto y offset por organización), tabla A (bloque, rango y offset), tabla B (línea o conjunto y tag en directa, 2 y 4 vías, con el bloque en binario) y qué bloques compiten con el de referencia |
+| Trazas de accesos | Accesos `LW`/`SW` con su dirección | Una letra por bloque (A, B, C… por orden de aparición); tabla de cada organización con H/M, lugar (`L4`, `S4/V0`, `V0`), víctima (`A limpia`, `B sucia`, `—`) y write-back con su rango; totales; estado final de la zona utilizada; comparación entre políticas; primer acceso que cambia entre organizaciones y su motivo; y el estado de la caché tras cualquier acceso |
+| Conjunto y write-back | Vías, número de conjunto, estado inicial (V, D, tag y orden LRU) y accesos | Resolución acceso a acceso (bloque, offset, conjunto, tag, H/M, vía, víctima, write-back y rango escrito) y estado final con el orden LRU actualizado |
+
+Cada resultado lleva un botón con una bombilla que explica el método.
+
+## Prácticas
+
+La página **Prácticas** ofrece tres exámenes (**Fácil**, **Intermedio** y **Difícil**). Todos tienen las mismas diez actividades:
+
+1. Diagnóstico: posiciones y rango, bits del bus, bloque y offset, líneas, bits de tag/línea/offset, conjuntos y tres preguntas de teoría.
+2. De la dirección a la ubicación: tabla A, tabla B y bloques que compiten.
+3. Variantes A a D: traza de accesos en directa, 2 vías, 4 vías y completamente asociativa, con estado final, totales y primer acceso que cambia frente a otra organización.
+4. Comparación entre políticas.
+5. Encuentra el error.
+6. Escritura y write-back sobre un conjunto con estado inicial.
+7. Prueba final: secuencia de accesos sobre un conjunto y frases a completar.
+
+| Nivel | Qué cambia |
+| --- | --- |
+| Fácil | Configuración habitual (bus de 16 bits, caché de 128 B, bloque de 8 B), 8 accesos y muchas celdas dadas |
+| Intermedio | La misma configuración, 12 accesos, menos celdas dadas, 5 bloques que compiten y un conjunto con *hit* de escritura |
+| Difícil | Bus de 15 bits y bloques de 16 B, 16 accesos, 9 bloques (la completamente asociativa también expulsa), conjuntos de 4 vías con una vía inválida y casi nada dado |
+
+**Corrección.** El botón *Comprobar* (por actividad o de todo el examen) marca cada celda en verde, en rojo o con «?» si está sin responder. No muestra la solución. Las respuestas se comparan por su valor, no por su escritura: `0x204`, `0X204`, `204` y `0x0204` son lo mismo; `Sí`, `si` y `S` también; `L4` y `l4`; `S4/V0` y `s4 - v0`; `A limpia` y `a (limpia)`; los rangos admiten `-`, `–` y `—`. Las respuestas se guardan en el navegador.
+
+**Pistas.** La bombilla de cada actividad explica el método con los parámetros del examen, por ejemplo: pasar el bloque a binario en grupos de 4 cifras y separar de derecha a izquierda los bits de línea o conjunto; el resto es el tag.
+
+**Solución.** Al final de cada examen se descarga un PDF con todas las tablas resueltas y una explicación de cómo se obtiene cada resultado. Los PDF se generan al compilar la web (`npm run build`) con los mismos datos y el mismo motor que la corrección.
+
+Los ejercicios son originales. Sus datos están en `src/exams.js` y sus soluciones se calculan con `src/blockmodel.js`, que se comprueba con tests y con un modelo de referencia independiente.
+
+## Tema claro y oscuro
+
+El botón del sol y la luna (arriba a la izquierda) cambia toda la web entre tema oscuro (por defecto) y claro, con una transición suave de medio segundo. La elección se recuerda en el navegador. Con «reducir movimiento» activado en el sistema, el cambio es instantáneo.
+
 ## Verificación
 
 `npm test` ejecuta:
@@ -107,6 +150,8 @@ Puedes elegir qué organizaciones exportar. Los libros se abren con Excel y Libr
 - el ejercicio de ejemplo, con los resultados esperados de las cuatro cachés;
 - pruebas del parser y de los mensajes de error;
 - una comparación con un modelo de referencia independiente (`tests/reference.js`) sobre programas aleatorios;
-- la generación del libro de Excel.
+- la generación del libro de Excel;
+- el modelo de ejercicios (`src/blockmodel.js`) frente al mismo modelo de referencia independiente;
+- los tres exámenes de práctica: celdas únicas, dificultad creciente, variedad de casos, solución aceptada por el corrector y generación de los PDF.
 
 El modelo de referencia comprueba que el motor cumple las convenciones anteriores. No sustituye la comparación con la solución de un enunciado concreto: si tu asignatura usa otras convenciones, revisa el resultado con tu enunciado.

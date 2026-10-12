@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Prácticas de memoria caché: tres exámenes (fácil, intermedio y difícil) con corrección automática, pistas y solución en PDF.">
+<meta name="theme-color" content="#0B0D10">
+<title>CacheTrace · Prácticas de memoria caché</title>
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<script>
+/*__THEME_JS__*/
+</script>
+<style>
+/*__FONTS__*/
+/*__BASE_CSS__*/
+.pwrap { max-width: 1120px; margin: 0 auto; padding: 22px 20px 56px; display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 640px) { .pwrap { padding: 16px 12px 44px; } }
+.phead p { color: var(--muted); max-width: 70ch; margin-top: 6px; }
+
+/* difficulty selector */
+.levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .levels { grid-template-columns: 1fr; } }
+.lvl { --lvl: #2DBE7E; text-align: left; cursor: pointer; padding: 12px 16px; border-radius: 12px; border: 1.5px solid color-mix(in srgb, var(--lvl) 45%, var(--line)); background: color-mix(in srgb, var(--lvl) 7%, var(--surface)); color: var(--ink); transition: background-color .3s ease, border-color .3s ease, color .3s ease, transform .15s ease, box-shadow .3s ease; display: flex; flex-direction: column; gap: 2px; }
+.lvl[data-level="medio"] { --lvl: #F0B429; }
+.lvl[data-level="dificil"] { --lvl: #EF6B6B; }
+.lvl b { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.lvl b::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--lvl); box-shadow: 0 0 0 3px color-mix(in srgb, var(--lvl) 25%, transparent); transition: background-color .3s ease, box-shadow .3s ease; }
+.lvl small { color: var(--muted); font-size: 12.5px; transition: color .3s ease; }
+.lvl:hover { background: color-mix(in srgb, var(--lvl) 20%, var(--surface)); border-color: var(--lvl); transform: translateY(-1px); }
+.lvl[aria-selected="true"] { background: var(--lvl); border-color: var(--lvl); color: #11151A; box-shadow: 0 10px 24px -14px var(--lvl); }
+.lvl[aria-selected="true"] small { color: rgba(17, 21, 26, 0.74); }
+.lvl[aria-selected="true"] b::before { background: #11151A; box-shadow: 0 0 0 3px rgba(17, 21, 26, 0.18); }
+@media (prefers-reduced-motion: reduce) { .lvl { transition: none; } .lvl:hover { transform: none; } }
+
+/* exam header and navigation chips */
+.exam-head { display: flex; flex-direction: column; gap: 12px; }
+.exam-head h2 { font-size: 20px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.meta b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+.bar { height: 8px; border-radius: 99px; background: var(--field); border: 1px solid var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 600 12.5px var(--mono); text-decoration: none; color: var(--ink); border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 10px; transition: background-color .2s, border-color .2s; }
+.chip:hover { border-color: var(--ink); }
+.chip.ok { background: var(--ok-bg); border-color: var(--ok-ink); color: var(--ok-ink); }
+.chip.bad { background: var(--bad-bg); border-color: var(--bad-ink); color: var(--bad-ink); }
+
+/* activity sections */
+.act { display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 76px; }
+.act h2 { font-size: 17px; }
+.act .intro { color: var(--muted); font-size: 14px; }
+.blk-p { font-size: 14px; }
+.blk-p.strong { font-weight: 600; margin-top: 4px; }
+.act-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
+.badge { font: 600 13px var(--mono); border-radius: 99px; padding: 4px 12px; border: 1px solid var(--line); color: var(--muted); }
+.badge.ok { background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-ink); }
+.badge.bad { background: var(--bad-bg); color: var(--bad-ink); border-color: var(--bad-ink); }
+
+/* answer cells */
+table.ex td { padding: 4px 6px; }
+table.ex td.l { padding: 6px 10px; }
+.given { display: inline-block; min-width: 38px; padding: 5px 9px; border-radius: 6px; background: var(--given); color: var(--ink); font: 13px var(--mono); }
+.cw { position: relative; display: inline-flex; align-items: center; }
+.cw input.cell, .cw select.cell { padding: 5px 8px; font-size: 13px; border-radius: 6px; transition: background-color .2s, border-color .2s; }
+.cw input.cell { text-align: center; }
+.cw input.cell.w-int { width: 74px; } .cw input.cell.w-hex { width: 92px; } .cw input.cell.w-hexrange { width: 178px; } .cw input.cell.w-hm, .cw input.cell.w-yn { width: 62px; } .cw input.cell.w-place { width: 92px; }
+.cw input.cell.w-victim { width: 122px; } .cw input.cell.w-victimtag { width: 168px; } .cw input.cell.w-letters { width: 118px; } .cw input.cell.w-hexlist { width: 250px; } .cw input.cell.w-way, .cw input.cell.w-state, .cw input.cell.w-ways { width: 74px; }
+.cw select.cell { width: auto; max-width: 100%; }
+.cw select.wide { max-width: 520px; width: 100%; }
+td.wrap .cw { display: flex; }
+.cw.st-ok input.cell, .cw.st-ok select.cell { background: var(--ok-bg); border-color: var(--ok-ink); color: var(--ok-ink); }
+.cw.st-bad input.cell, .cw.st-bad select.cell { background: var(--bad-bg); border-color: var(--bad-ink); color: var(--bad-ink); }
+.cw.st-empty input.cell, .cw.st-empty select.cell { border-style: dashed; border-color: var(--accent-text); }
+.cw .mk { margin-left: 5px; font: 700 13px var(--ui); width: 14px; }
+.cw.st-ok .mk { color: var(--ok-ink); } .cw.st-bad .mk { color: var(--bad-ink); } .cw.st-empty .mk { color: var(--accent-text); }
+.multi { display: inline-flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
+.multi label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.qa-cells { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.qa-cells label.ql { font-size: 12.5px; color: var(--muted); margin-right: 6px; }
+table.grid.qa { width: 100%; }
+table.qa td.q { max-width: 520px; white-space: normal; text-align: left; font-family: var(--ui); }
+table.qa td.l:last-child { white-space: normal; }
+.ex-wrap { overflow-x: auto; }
+
+/* final bar */
+.final-bar { display: flex; flex-direction: column; gap: 12px; }
+.final-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.score { font-size: 15px; }
+.score b { font: 700 18px var(--mono); }
+.live-sr { position: absolute; left: -9999px; }
+</style>
+</head>
+<body data-page="practicas">
+<!--__CHROME__-->
+<div class="pwrap">
+  <header class="phead">
+    <h1>Prácticas de caché</h1>
+    <p>Tres exámenes con los mismos tipos de ejercicio: diagnóstico, de la dirección a la ubicación, las cuatro variantes, comparación, errores, escritura con write-back y prueba final. Rellénalos y pulsa Comprobar: las celdas correctas se marcan en verde y las incorrectas en rojo.</p>
+  </header>
+
+  <div class="levels" role="tablist" aria-label="Dificultad del examen">
+    <button class="lvl" type="button" role="tab" data-level="facil"><b>Fácil</b><small>Configuración habitual y bastantes celdas dadas</small></button>
+    <button class="lvl" type="button" role="tab" data-level="medio"><b>Intermedio</b><small>Menos ayudas, más accesos y estados iniciales</small></button>
+    <button class="lvl" type="button" role="tab" data-level="dificil"><b>Difícil</b><small>Parámetros distintos y casi nada dado</small></button>
+  </div>
+
+  <section class="panel exam-head" id="examHead"></section>
+  <div id="sections" class="stack" style="gap:16px"></div>
+
+  <section class="panel final-bar" id="finalBar">
+    <h2>Al terminar</h2>
+    <div class="final-actions">
+      <button class="btn primary" type="button" id="checkAll">Comprobar todo</button>
+      <button class="btn" type="button" id="reset">Reiniciar el examen</button>
+      <a class="btn" id="pdf" href="#" download>Descargar la solución (PDF)</a>
+    </div>
+    <p class="score" id="score">Aún no has comprobado el examen.</p>
+    <p class="note">La solución en PDF incluye todas las tablas resueltas y cómo se obtiene cada resultado. Úsala para repasar después de intentarlo.</p>
+  </section>
+</div>
+<footer class="foot">CacheTrace v{{VERSION}} · Licencia MIT · <a href="{{REPO_URL}}" target="_blank" rel="noopener">Código en GitHub</a> · Tus respuestas se guardan solo en este navegador.</footer>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="live-sr" id="live" role="status" aria-live="polite"></div>
+
+<script>
+/*__LIBS__*/
+</script>
+<script>
+/*__EXAMS__*/
+</script>
+<script>
+(function () {
+  'use strict';
+  const $ = (s, r) => (r || document).querySelector(s);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const LEVELS = ['facil', 'medio', 'dificil'];
+  const SHORT = { diag: '1', ubic: '2', 'trace-DM': '3A', 'trace-SA2': '3B', 'trace-SA4': '3C', 'trace-FA': '3D', comp: '4', error: '5', wb: '6', final: 'Final' };
+  const NAMES = { facil: 'fácil', medio: 'intermedio', dificil: 'difícil' };
+  let exam = null, answers = {}, wrappers = new Map(), sectionCells = new Map();
+  let toastTimer;
+  const toast = (t) => { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 2600); };
+
+  /* ------------------------------------------------------------ storage */
+  const key = (id) => 'ct-prac-v1-' + id;
+  function save() { try { localStorage.setItem(key(exam.id), JSON.stringify(answers)); } catch (e) { /* not remembered */ } }
+  function loadAnswers(id) { try { return JSON.parse(localStorage.getItem(key(id))) || {}; } catch (e) { return {}; } }
+
+  /* ------------------------------------------------------------ cell controls */
+  const isEmptyAnswer = (c) => { const v = answers[c.id]; return Array.isArray(v) ? !v.length : Checker.isEmpty(v); };
+  function statusOf(c) { return Checker.check(c.t, answers[c.id] === undefined ? (c.t === 'multi' ? [] : '') : answers[c.id], c.exp); }
+
+  function renderCell(c, label) {
+    if (c.given) {
+      const s = document.createElement('span'); s.className = 'given'; s.textContent = Exams.fmt(c); return s;
+    }
+    const wrap = document.createElement('span'); wrap.className = 'cw';
+    let control;
+    if (c.t === 'select') {
+      control = document.createElement('select');
+      control.className = 'cell' + (c.wide ? ' wide' : '');
+      control.innerHTML = '<option value="">Elige…</option>' + c.opts.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+      control.value = answers[c.id] || '';
+      control.addEventListener('change', () => onAnswer(c, control.value));
+    } else if (c.t === 'multi') {
+      control = document.createElement('span'); control.className = 'multi'; control.setAttribute('role', 'group');
+      const cur = Array.isArray(answers[c.id]) ? answers[c.id] : [];
+      c.opts.forEach((o) => {
+        const l = document.createElement('label'); const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = o; cb.checked = cur.includes(o);
+        cb.addEventListener('change', () => { const sel = Array.from(control.querySelectorAll('input:checked')).map((x) => x.value); onAnswer(c, sel); });
+        l.appendChild(cb); l.appendChild(document.createTextNode(o)); control.appendChild(l);
+      });
+    } else {
+      control = document.createElement('input'); control.type = 'text';
+      control.className = 'cell w-' + c.t;
+      control.value = answers[c.id] || ''; control.placeholder = c.ph || ''; control.autocomplete = 'off'; control.spellcheck = false; control.setAttribute('autocapitalize', 'off');
+      control.addEventListener('input', () => onAnswer(c, control.value));
+    }
+    control.setAttribute('aria-label', label); control.dataset.id = c.id;
+    wrap.appendChild(control);
+    const mk = document.createElement('i'); mk.className = 'mk'; mk.setAttribute('aria-hidden', 'true'); wrap.appendChild(mk);
+    wrappers.set(c.id, wrap);
+    return wrap;
+  }
+
+  function mark(c, st) {
+    const w = wrappers.get(c.id); if (!w) return;
+    w.classList.remove('st-ok', 'st-bad', 'st-empty');
+    const mk = $('.mk', w);
+    if (!st) { mk.textContent = ''; w.removeAttribute('title'); return; }
+    w.classList.add('st-' + st);
+    mk.textContent = st === 'ok' ? '✓' : st === 'bad' ? '✗' : '?';
+    w.title = st === 'ok' ? 'Correcto' : st === 'bad' ? 'Incorrecto' : 'Sin responder';
+  }
+
+  function onAnswer(c, v) {
+    answers[c.id] = v; save(); mark(c, null); updateProgress();
+  }
+
+  /* ------------------------------------------------------------ blocks */
+  function renderTable(b, secTitle) {
+    const wrap = document.createElement('div'); wrap.className = 'ex-wrap';
+    const t = document.createElement('table'); t.className = 'grid ex';
+    if (b.caption) { const cap = document.createElement('caption'); cap.textContent = b.caption; t.appendChild(cap); }
+    const thead = document.createElement('thead'); const hr = document.createElement('tr');
+    b.head.forEach((h, i) => { const th = document.createElement('th'); th.textContent = h; if (b.wideLast && i === b.head.length - 1) th.className = 'l'; hr.appendChild(th); });
+    thead.appendChild(hr); t.appendChild(thead);
+    const tb = document.createElement('tbody');
+    b.rows.forEach((row, ri) => {
+      const tr = document.createElement('tr');
+      row.forEach((item, ci) => {
+        const td = document.createElement('td');
+        if (item && typeof item === 'object' && 't' in item) {
+          if (item.wide) td.className = 'wrap';
+          td.appendChild(renderCell(item, `${b.head[ci]}, fila ${ri + 1} (${secTitle})`));
+          sectionCells.get(secTitle).push(item);
+        } else {
+          td.textContent = item;
+          if (ci === 1 && b.wideLast) td.className = 'l wrap';
+        }
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); wrap.appendChild(t);
+    return wrap;
+  }
+
+  function renderQA(b, secTitle) {
+    const wrap = document.createElement('div'); wrap.className = 'ex-wrap';
+    const t = document.createElement('table'); t.className = 'grid ex qa';
+    const tb = document.createElement('tbody');
+    b.rows.forEach((row) => {
+      const tr = document.createElement('tr');
+      const q = document.createElement('td'); q.className = 'q l wrap'; q.textContent = row.q; tr.appendChild(q);
+      const a = document.createElement('td'); a.className = 'l';
+      const box = document.createElement('div'); box.className = 'qa-cells';
+      row.cells.forEach((cc) => {
+        const item = document.createElement('span'); item.style.display = 'inline-flex'; item.style.alignItems = 'center';
+        if (cc.label) { const l = document.createElement('label'); l.className = 'ql'; l.textContent = cc.label; item.appendChild(l); }
+        item.appendChild(renderCell(cc.cell, `${cc.label || 'Respuesta'}: ${row.q}`));
+        sectionCells.get(secTitle).push(cc.cell);
+        box.appendChild(item);
+      });
+      a.appendChild(box); tr.appendChild(a); tb.appendChild(tr);
+    });
+    t.appendChild(tb); wrap.appendChild(t);
+    return wrap;
+  }
+
+  /* ------------------------------------------------------------ checking */
+  function checkSection(s) {
+    const cells = sectionCells.get(s.title).filter((c) => !c.given);
+    let ok = 0;
+    cells.forEach((c) => { const st = statusOf(c); mark(c, st); if (st === 'ok') ok++; });
+    const badge = $('#badge-' + s.id), chip = $('#chip-' + s.id);
+    badge.textContent = `${ok} / ${cells.length}`;
+    badge.className = 'badge ' + (ok === cells.length ? 'ok' : 'bad');
+    chip.className = 'chip ' + (ok === cells.length ? 'ok' : 'bad');
+    return { ok, total: cells.length };
+  }
+  function checkAll() {
+    let ok = 0, total = 0;
+    exam.sections.forEach((s) => { const r = checkSection(s); ok += r.ok; total += r.total; });
+    const pct = total ? (ok === total ? 100 : Math.min(99, Math.floor((100 * ok) / total))) : 0;
+    $('#score').innerHTML = `Has acertado <b>${ok}</b> de <b>${total}</b> celdas (${pct} %). ${ok === total ? 'Examen completo sin errores.' : 'Revisa las celdas rojas y las que tienen “?” (sin responder); abre la pista de cada actividad si te atascas.'}`;
+    $('#live').textContent = `Resultado: ${ok} de ${total} celdas correctas.`;
+    toast(`${ok} de ${total} correctas`);
+  }
+  function updateProgress() {
+    const cells = exam.scored;
+    const done = cells.filter((c) => !isEmptyAnswer(c)).length;
+    $('#progressBar').style.width = (cells.length ? (100 * done) / cells.length : 0) + '%';
+    $('#progressTxt').textContent = `${done} de ${cells.length}`;
+  }
+
+  /* ------------------------------------------------------------ exam rendering */
+  function render(levelId) {
+    exam = Exams.build(levelId);
+    answers = loadAnswers(levelId);
+    wrappers = new Map(); sectionCells = new Map();
+    try { localStorage.setItem('ct-prac-level', levelId); } catch (e) { /* not remembered */ }
+    Array.from(document.querySelectorAll('.lvl')).forEach((b) => b.setAttribute('aria-selected', String(b.dataset.level === levelId)));
+
+    const g = exam.geo.dm, cfg = exam.cfg;
+    $('#examHead').innerHTML = `<h2>Examen ${esc(NAMES[levelId])}</h2>
+      <div class="meta"><span>Bus <b>${cfg.addrBits} bits</b></span><span>Memoria <b>${g.memBytes >= 1024 ? g.memBytes / 1024 + ' KiB' : g.memBytes + ' B'}</b></span><span>Caché <b>${cfg.cacheBytes} B</b> (${g.lines} líneas)</span><span>Bloque <b>${cfg.blockBytes} B</b></span><span>Accesos <b>${exam.stats.accesses}</b> en ${exam.stats.blocks} bloques</span></div>
+      <p class="note">${esc(exam.note)} Write-back con write-allocate; LRU; primero la vía inválida de menor número. Estado inicial: caché vacía (todas las líneas con V = 0), salvo en las actividades 6 y final, que indican el estado de su conjunto. Las celdas grises son datos del enunciado.</p>
+      <div class="meta"><span>Progreso <b id="progressTxt"></b> celdas</span></div><div class="bar" aria-hidden="true"><i id="progressBar"></i></div>
+      <nav class="chips" aria-label="Actividades">${exam.sections.map((s) => `<a class="chip" id="chip-${s.id}" href="#sec-${s.id}">${SHORT[s.id]}</a>`).join('')}</nav>`;
+
+    const root = $('#sections'); root.innerHTML = '';
+    exam.sections.forEach((s) => {
+      sectionCells.set(s.title, []);
+      const sec = document.createElement('section'); sec.className = 'panel act'; sec.id = 'sec-' + s.id;
+      const head = document.createElement('div'); head.className = 'sec-head';
+      const h = document.createElement('h2'); h.textContent = s.title; head.appendChild(h);
+      const hint = HintUI.create(Hints.get(s.hint, cfg)); head.appendChild(hint.button);
+      sec.appendChild(head); sec.appendChild(hint.panel);
+      const intro = document.createElement('p'); intro.className = 'intro'; intro.textContent = s.intro; sec.appendChild(intro);
+      s.blocks.forEach((b) => {
+        if (b.k === 'p') { const p = document.createElement('p'); p.className = 'blk-p' + (b.strong ? ' strong' : ''); p.textContent = b.text; sec.appendChild(p); }
+        if (b.k === 'table') sec.appendChild(renderTable(b, s.title));
+        if (b.k === 'qa') sec.appendChild(renderQA(b, s.title));
+      });
+      const foot = document.createElement('div'); foot.className = 'act-foot';
+      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; btn.textContent = 'Comprobar esta actividad';
+      btn.addEventListener('click', () => { const r = checkSection(s); toast(`${r.ok} de ${r.total} correctas`); });
+      const badge = document.createElement('span'); badge.className = 'badge'; badge.id = 'badge-' + s.id; badge.textContent = `${sectionCells.get(s.title).filter((c) => !c.given).length} celdas`;
+      foot.appendChild(btn); foot.appendChild(badge); sec.appendChild(foot);
+      root.appendChild(sec);
+    });
+
+    const pdf = $('#pdf');
+    pdf.href = `./soluciones/examen-${levelId}.pdf`;
+    pdf.setAttribute('download', `solucion-examen-${levelId}.pdf`);
+    $('#score').textContent = 'Aún no has comprobado el examen.';
+    updateProgress();
+  }
+
+  /* ------------------------------------------------------------ wiring */
+  document.querySelectorAll('.lvl').forEach((b) => b.addEventListener('click', () => { render(b.dataset.level); history.replaceState(null, '', '#' + b.dataset.level); window.scrollTo({ top: 0, behavior: 'auto' }); }));
+  $('#checkAll').addEventListener('click', checkAll);
+  $('#reset').addEventListener('click', () => {
+    if (!window.confirm('Se borrarán todas tus respuestas de este examen. ¿Continuar?')) return;
+    answers = {}; save(); render(exam.id); toast('Examen reiniciado');
+  });
+
+  let start = (location.hash || '').replace('#', '');
+  if (!LEVELS.includes(start)) { try { start = localStorage.getItem('ct-prac-level'); } catch (e) { start = null; } }
+  if (!LEVELS.includes(start)) start = 'facil';
+  render(start);
+  window.addEventListener('hashchange', () => { const h = location.hash.replace('#', ''); if (LEVELS.includes(h) && exam.id !== h) render(h); });
+})();
+</script>
+</body>
+</html>

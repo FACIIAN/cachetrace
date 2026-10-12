@@ -468,7 +468,7 @@ const CacheLab = (function () {
           [cTag, cSet, cOff, cHit, cEv, cWb, cLine].forEach((col) => { if (col) styleTxt(col); });
           const cm = ws.getCell(rr, cCom); cm.font = font; cm.alignment = { vertical: 'middle', wrapText: false }; cm.border = { top, left: thin, right: med, bottom: thin };
           if (row.empty) {
-            // colored, empty row (instruction without memory access) — keeps the class layout
+            // empty row (instruction without memory access)
             return;
           }
           cc.value = H(row.addr, mr.hexD);

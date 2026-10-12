@@ -1,5 +1,5 @@
 'use strict';
-// Servidor estático mínimo para probar ./dist en local (npm run build && npm start).
+// Minimal static server to try ./dist locally (npm run build && npm start).
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');

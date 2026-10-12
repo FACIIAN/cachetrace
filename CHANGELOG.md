@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] - 2026-10-10
+
+### Added
+- **Calculator** (`/calculadora/`): block, offset, block range, line or set and tag; competing blocks; access traces on the four organizations with letters, victims and write-back ranges; comparison between policies; first access that changes; and set resolution with an initial state.
+- **Practice exams** (`/practicas/`): three exams (easy, intermediate, hard) with ten activities each, lightbulb hints, tolerant grading (`0x204` = `0X204`) with green/red cells, and a downloadable PDF solution per exam. Colour-coded difficulty selector.
+- Light and dark theme for the whole website, with a half-second fade and a button at the top left.
+- Common top bar with links between the three tools.
+- Tests for the exercise model, the checker and the exams (45 in total), including a cross-check with the independent reference model.
+- Guides for the calculator and the practice exams.
+
+### Changed
+- The simulator moved to `/simulador/` (the old `/app/` address redirects there). The tools now share their styles, fonts and size fields.
+- The website no longer bundles the fonts inside every page: they are loaded from `assets/fonts/`.
+- The landing page presents the three tools; the accent colour is used for text only in the dark theme.
+
 ## [1.2.0] - 2026-10-04
 
 ### Added
